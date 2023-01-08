@@ -1,6 +1,8 @@
-package middlewares
+package handlers
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -34,7 +36,7 @@ func (s *statusResponseWriter) ReadFrom(r io.Reader) (int64, error) {
 	return io.Copy(s.ResponseWriter, r)
 }
 
-func Logger(next http.Handler) http.Handler {
+func logRequest(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		rw := &statusResponseWriter{ResponseWriter: w}
 		start := time.Now()
@@ -44,4 +46,20 @@ func Logger(next http.Handler) http.Handler {
 		next.ServeHTTP(rw, r)
 	}
 	return http.HandlerFunc(fn)
+}
+
+func recoverPanic(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				if e, ok := err.(error); ok && errors.Is(e, http.ErrAbortHandler) {
+					panic(err)
+				}
+				w.Header().Set("Connection", "close")
+				serverError(w, fmt.Errorf("%v", err))
+			}
+		}()
+
+		next.ServeHTTP(w, r)
+	})
 }

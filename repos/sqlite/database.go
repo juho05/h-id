@@ -1,9 +1,9 @@
 package sqlite
 
 import (
-	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/oklog/ulid/v2"
 
 	"github.com/Bananenpro/h-id/repos"
 )
@@ -24,5 +24,5 @@ func Connect(connectionString string) (repos.DB, error) {
 }
 
 func newID() string {
-	return uuid.NewString()
+	return ulid.Make().String()
 }

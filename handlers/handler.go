@@ -4,10 +4,14 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+
+	"github.com/Bananenpro/h-id/services"
 )
 
 type Handler struct {
-	Router chi.Router
+	Router      chi.Router
+	AuthService services.AuthService
+	UserService services.UserService
 }
 
 func NewHandler() *Handler {
