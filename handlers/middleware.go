@@ -41,7 +41,10 @@ func logRequest(next http.Handler) http.Handler {
 		rw := &statusResponseWriter{ResponseWriter: w}
 		start := time.Now()
 		defer func() {
-			log.Tracef("%s %s, status: %d %s, duration: %s", r.Method, r.URL.String(), rw.status, http.StatusText(rw.status), time.Since(start).String())
+			u := r.URL
+			u.RawQuery = ""
+			u.RawFragment = ""
+			log.Tracef("%s %s, status: %d %s, duration: %s", r.Method, u.String(), rw.status, http.StatusText(rw.status), time.Since(start).String())
 		}()
 		next.ServeHTTP(rw, r)
 	}
