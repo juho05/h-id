@@ -18,6 +18,23 @@ type options struct {
 	port int
 }
 
+func run() error {
+	handler := handlers.NewHandler()
+	handler.Router = chi.NewRouter()
+
+	handler.RegisterMiddlewares()
+	handler.RegisterRoutes()
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	addr := fmt.Sprintf(":%s", port)
+	log.Infof("Listening on %s...", addr)
+	return http.ListenAndServe(addr, handler)
+}
+
 func initLogger() {
 	level := os.Getenv("LOG_LEVEL")
 	if level == "" {
@@ -45,20 +62,6 @@ func initLogger() {
 			log.SetOutput(file)
 		}
 	}
-}
-
-func run() error {
-	handler := handlers.NewHandler()
-	handler.Router = chi.NewRouter()
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
-	addr := fmt.Sprintf(":%s", port)
-	log.Infof("Listening on %s...", addr)
-	return http.ListenAndServe(addr, handler)
 }
 
 func main() {
