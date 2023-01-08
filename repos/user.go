@@ -1,9 +1,11 @@
 package repos
 
-import "context"
+import (
+	"context"
+)
 
 type UserModel struct {
-	ID             string `db:"id"`
+	BaseModel
 	Name           string `db:"name"`
 	Email          string `db:"email"`
 	EmailConfirmed bool   `db:"email_confirmed"`

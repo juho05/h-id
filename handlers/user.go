@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -43,15 +44,17 @@ func (h *Handler) userSignUp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type response struct {
-		ID             string `json:"id"`
-		Name           string `json:"name"`
-		Email          string `json:"email"`
-		EmailConfirmed bool   `json:"emailConfirmed"`
+		ID             string    `json:"id"`
+		Name           string    `json:"name"`
+		Email          string    `json:"email"`
+		EmailConfirmed bool      `json:"emailConfirmed"`
+		Created        time.Time `json:"created"`
 	}
 	respond(w, http.StatusCreated, response{
 		ID:             user.ID,
 		Name:           user.Name,
 		Email:          user.Email,
 		EmailConfirmed: user.EmailConfirmed,
+		Created:        user.Created,
 	})
 }

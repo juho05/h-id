@@ -1,6 +1,8 @@
 package sqlite
 
 import (
+	"time"
+
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/oklog/ulid/v2"
@@ -23,6 +25,9 @@ func Connect(connectionString string) (repos.DB, error) {
 	}, nil
 }
 
-func newID() string {
-	return ulid.Make().String()
+func newBase() repos.BaseModel {
+	return repos.BaseModel{
+		ID:      ulid.Make().String(),
+		Created: time.Now(),
+	}
 }
