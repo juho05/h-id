@@ -12,6 +12,6 @@ type Transaction interface {
 }
 
 type BaseModel struct {
-	ID      string    `db:"id"`
-	Created time.Time `db:"created"`
+	ID        string    `db:"id"`
+	CreatedAt time.Time `db:"created_at"`
 }

@@ -27,7 +27,7 @@ func Connect(connectionString string) (repos.DB, error) {
 
 func newBase() repos.BaseModel {
 	return repos.BaseModel{
-		ID:      ulid.Make().String(),
-		Created: time.Now(),
+		ID:        ulid.Make().String(),
+		CreatedAt: time.Now(),
 	}
 }

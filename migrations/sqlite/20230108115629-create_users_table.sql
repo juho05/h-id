@@ -1,11 +1,11 @@
 -- +migrate Up
 CREATE TABLE users (
 	id TEXT NOT NULL PRIMARY KEY,
+	created_at TEXT NOT NULL,
 	name TEXT NOT NULL,
 	email TEXT NOT NULL UNIQUE,
 	email_confirmed INTEGER NOT NULL DEFAULT 0,
-	password_hash BLOB NOT NULL,
-	created TEXT NOT NULL
+	password_hash BLOB NOT NULL
 );
 
 -- +migrate Down

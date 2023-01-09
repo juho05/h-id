@@ -81,7 +81,7 @@ func (u *userTransaction) Create(name, email string, passwordHash []byte) (*repo
 		EmailConfirmed: false,
 		PasswordHash:   passwordHash,
 	}
-	_, err := u.tx.Exec("INSERT INTO users (id, name, email, email_confirmed, password_hash, created) VALUES (?, ?, ?, ?, ?, ?)", user.ID, user.Name, user.Email, user.EmailConfirmed, user.PasswordHash, user.Created)
+	_, err := u.tx.Exec("INSERT INTO users (id, created_at, name, email, email_confirmed, password_hash) VALUES (?, ?, ?, ?, ?, ?)", user.ID, user.CreatedAt, user.Name, user.Email, user.EmailConfirmed, user.PasswordHash)
 	if err != nil {
 		var sqliteErr sqlite3.Error
 		if errors.As(err, &sqliteErr) && sqliteErr.Code == sqlite3.ErrConstraint && strings.Contains(sqliteErr.Error(), "email") {

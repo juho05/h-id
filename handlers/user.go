@@ -48,13 +48,13 @@ func (h *Handler) userSignUp(w http.ResponseWriter, r *http.Request) {
 		Name           string    `json:"name"`
 		Email          string    `json:"email"`
 		EmailConfirmed bool      `json:"emailConfirmed"`
-		Created        time.Time `json:"created"`
+		CreatedAt      time.Time `json:"created_at"`
 	}
 	respond(w, http.StatusCreated, response{
 		ID:             user.ID,
 		Name:           user.Name,
 		Email:          user.Email,
 		EmailConfirmed: user.EmailConfirmed,
-		Created:        user.Created,
+		CreatedAt:      user.CreatedAt,
 	})
 }
