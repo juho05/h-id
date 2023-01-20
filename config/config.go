@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/Bananenpro/log"
 )
@@ -138,9 +139,39 @@ func TLSKey() (path string) {
 	defer func() {
 		values["TLS_KEY"] = path
 	}()
-	path = os.Getenv("TLS_KEY")
-	if path == "" {
-		return ""
+	return os.Getenv("TLS_KEY")
+}
+
+func EmailUsername() (username string) {
+	if n, ok := values["EMAIL_USERNAME"]; ok {
+		return n.(string)
 	}
-	return path
+	defer func() {
+		values["EMAIL_USERNAME"] = username
+	}()
+	return os.Getenv("EMAIL_USERNAME")
+}
+
+func EmailPassword() (username string) {
+	if n, ok := values["EMAIL_PASSWORD"]; ok {
+		return n.(string)
+	}
+	defer func() {
+		values["EMAIL_PASSWORD"] = username
+	}()
+	return os.Getenv("EMAIL_PASSWORD")
+}
+
+func EmailHost() (host string) {
+	if n, ok := values["EMAIL_HOST"]; ok {
+		return n.(string)
+	}
+	defer func() {
+		values["EMAIL_HOST"] = host
+	}()
+	host = os.Getenv("EMAIL_HOST")
+	if !strings.Contains(host, ":") {
+		host += ":587"
+	}
+	return host
 }

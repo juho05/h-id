@@ -26,6 +26,7 @@ func run() error {
 		return fmt.Errorf("Failed to connect to database:", err)
 	}
 	userRepo := db.NewUserRepository()
+	tokenRepo := db.NewTokenRepository()
 
 	handler.SessionManager = scs.New()
 	handler.SessionManager.Store = db.NewSessionRepository()
@@ -33,7 +34,9 @@ func run() error {
 	handler.SessionManager.IdleTimeout = 12 * time.Hour
 	handler.SessionManager.Cookie.Secure = true
 
-	handler.AuthService = services.NewAuthService(userRepo, handler.SessionManager)
+	emailService := services.NewEmailService(hid.EmailFS)
+
+	handler.AuthService = services.NewAuthService(userRepo, tokenRepo, handler.SessionManager, emailService)
 	handler.UserService = services.NewUserService(userRepo, handler.AuthService)
 
 	handler.Renderer, err = handlers.NewRenderer(hid.HTMLFS)

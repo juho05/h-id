@@ -3,6 +3,7 @@ package repos
 type DB interface {
 	NewUserRepository() UserRepository
 	NewSessionRepository() SessionRepository
+	NewTokenRepository() TokenRepository
 }
 
 type Transaction interface {

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -17,6 +18,9 @@ func (h *Handler) userRoutes(r chi.Router) {
 	r.Post("/signup", h.userSignUp)
 	r.Get("/login", h.userLoginPage)
 	r.Post("/login", h.userLogin)
+
+	r.Get("/confirmEmail", h.userConfirmEmailPage)
+	r.Post("/confirmEmail", h.userConfirmEmail)
 
 	r.With(h.auth).Get("/profile", h.userProfile)
 }
@@ -100,6 +104,83 @@ func (h *Handler) userLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if redirect := h.SessionManager.PopString(r.Context(), "loginRedirect"); redirect != "" {
+		http.Redirect(w, r, redirect, http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+}
+
+// GET /user/confirmEmail
+func (h *Handler) userConfirmEmailPage(w http.ResponseWriter, r *http.Request) {
+	if redirect := r.URL.Query().Get("redirect"); redirect != "" {
+		redirectUnescaped, err := url.QueryUnescape(redirect)
+		if err == nil {
+			u, err := url.Parse(redirectUnescaped)
+			if err == nil {
+				if u.IsAbs() {
+					clientError(w, http.StatusBadRequest)
+					return
+				}
+				h.SessionManager.Put(r.Context(), "confirmEmailRedirect", "/"+strings.TrimPrefix(redirectUnescaped, "/"))
+			}
+		}
+	} else {
+		h.SessionManager.Remove(r.Context(), "confirmEmailRedirect")
+	}
+
+	user, ok := h.authUser(w, r)
+	if !ok {
+		return
+	}
+
+	if user.EmailConfirmed {
+		if redirect := h.SessionManager.PopString(r.Context(), "confirmEmailRedirect"); redirect != "" {
+			http.Redirect(w, r, redirect, http.StatusSeeOther)
+			return
+		}
+		http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+		return
+	}
+
+	err := h.AuthService.SendConfirmEmail(r.Context(), user)
+	if err != nil && !errors.Is(err, services.ErrTimeout) {
+		serverError(w, err)
+		return
+	}
+
+	h.Renderer.render(w, http.StatusOK, "confirmEmail", h.newTemplateData(r))
+}
+
+// POST /user/confirmEmail
+func (h *Handler) userConfirmEmail(w http.ResponseWriter, r *http.Request) {
+	type request struct {
+		Code string `form:"code" validate:"required,numeric,len=6"`
+	}
+	body, ok := decodeAndValidateBody[request](h, w, r, "confirmEmail", nil)
+	if !ok {
+		return
+	}
+
+	userID := h.AuthService.AuthenticatedUserID(r.Context())
+	if userID == "" {
+		http.Redirect(w, r, fmt.Sprintf("/user/login?redirect=%s", url.QueryEscape(r.URL.Path)), http.StatusSeeOther)
+		return
+	}
+
+	err := h.AuthService.ConfirmEmail(r.Context(), userID, body.Code)
+	if err != nil {
+		if errors.Is(err, services.ErrInvalidCredentials) {
+			data := h.newTemplateData(r)
+			data.Errors = []string{"Invalid credentials."}
+			data.Form = body
+			h.Renderer.render(w, http.StatusUnauthorized, "confirmEmail", data)
+		} else {
+			serverError(w, err)
+		}
+		return
+	}
+
+	if redirect := h.SessionManager.PopString(r.Context(), "confirmEmailRedirect"); redirect != "" {
 		http.Redirect(w, r, redirect, http.StatusSeeOther)
 		return
 	}

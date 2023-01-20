@@ -13,9 +13,13 @@ var htmlFS embed.FS
 //go:embed ui/static
 var staticFS embed.FS
 
+//go:embed ui/email
+var emailFS embed.FS
+
 var (
 	HTMLFS   fs.FS
 	StaticFS fs.FS
+	EmailFS  fs.FS
 )
 
 func init() {
@@ -25,6 +29,10 @@ func init() {
 		log.Fatal(err)
 	}
 	StaticFS, err = fs.Sub(staticFS, "ui/static")
+	if err != nil {
+		log.Fatal(err)
+	}
+	EmailFS, err = fs.Sub(emailFS, "ui/email")
 	if err != nil {
 		log.Fatal(err)
 	}

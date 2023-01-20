@@ -82,9 +82,21 @@ func csrf(next http.Handler) http.Handler {
 
 func (h *Handler) auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		userID := h.SessionManager.GetString(r.Context(), "authUserID")
+		userID := h.AuthService.AuthenticatedUserID(r.Context())
 		if userID == "" {
 			http.Redirect(w, r, fmt.Sprintf("/user/login?redirect=%s", url.QueryEscape(r.URL.Path)), http.StatusSeeOther)
+			return
+		}
+
+		confirmed, err := h.AuthService.IsEmailConfirmed(r.Context(), userID)
+		if err != nil {
+			h.SessionManager.Destroy(r.Context())
+			http.Redirect(w, r, fmt.Sprintf("/user/login?redirect=%s", url.QueryEscape(r.URL.Path)), http.StatusSeeOther)
+			return
+		}
+
+		if !confirmed {
+			http.Redirect(w, r, fmt.Sprintf("/user/confirmEmail?redirect=%s", url.QueryEscape(r.URL.Path)), http.StatusSeeOther)
 			return
 		}
 

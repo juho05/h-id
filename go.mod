@@ -16,6 +16,7 @@ require (
 	github.com/justinas/nosurf v1.1.1
 	github.com/mattn/go-sqlite3 v1.14.16
 	github.com/oklog/ulid/v2 v2.1.0
+	github.com/xdg-go/pbkdf2 v1.0.0
 	golang.org/x/crypto v0.5.0
 )
 

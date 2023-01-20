@@ -1,0 +1,50 @@
+{{define "base"}}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>{{template "title" .}} - H-ID</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto" rel="stylesheet" type="text/css">
+  </head>
+  <body style="font-family: 'Roboto'">
+    <table align="center" border="0" cellpadding="0" cellspacing="0" width="550" bgcolor="white"
+    style="border:5px solid #250035">
+      <tbody>
+        <tr>
+          <td align="center">
+          <table align="center" border="0" cellpadding="0" cellspacing="0" class="col-550" width="550">
+            <tbody>
+              <tr>
+                <td align="center" style="background-color: #4d006e;min-height: 50px;">
+                  <a href="https://id.julianh.de" style="text-decoration: none;">
+                    <p style="color:white;font-weight:bold;font-size: 24px;">
+                      H-ID
+                    </p>
+                  </a>
+                </td>
+              </tr>
+              <tr>
+                <td style="background-color: white;min-height: 200px;">
+                  <div style="height: 200px; padding: 5px 10px;">
+                    <p style="color: black;font-size: 14px;">
+                      Dear {{.Name}},<br><br>
+                      {{template "content" .}}<br><br>
+                      ~ H-ID
+                    </p>
+                    <p style="color: gray;font-size: 10px;">
+                      {{template "smallPrint" .}}
+                    </p>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </td>
+        </tr>
+      </tbody>
+    </table>
+  </body>
+</html>
+</html>
+{{end}}

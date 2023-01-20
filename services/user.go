@@ -8,6 +8,7 @@ import (
 )
 
 type UserService interface {
+	Find(ctx context.Context, id string) (*repos.UserModel, error)
 	Create(ctx context.Context, name, email, password string) (*repos.UserModel, error)
 	Delete(ctx context.Context, id, password string) error
 }
@@ -22,6 +23,10 @@ func NewUserService(userRepository repos.UserRepository, authService AuthService
 		userRepo:    userRepository,
 		authService: authService,
 	}
+}
+
+func (u *userService) Find(ctx context.Context, id string) (*repos.UserModel, error) {
+	return u.userRepo.Find(ctx, id)
 }
 
 func (u *userService) Create(ctx context.Context, name, email, password string) (*repos.UserModel, error) {

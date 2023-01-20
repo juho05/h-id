@@ -16,6 +16,8 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/go-playground/validator/v10/non-standard/validators"
 	entrans "github.com/go-playground/validator/v10/translations/en"
+
+	"github.com/Bananenpro/h-id/repos"
 )
 
 var (
@@ -171,4 +173,17 @@ func respondJSONError(w http.ResponseWriter, err error, status int) {
 		Error: err.Error(),
 	}
 	json.NewEncoder(w).Encode(res)
+}
+
+func (h *Handler) authUser(w http.ResponseWriter, r *http.Request) (user *repos.UserModel, ok bool) {
+	userID := h.AuthService.AuthenticatedUserID(r.Context())
+
+	user, err := h.UserService.Find(r.Context(), userID)
+	if err != nil {
+		h.SessionManager.Destroy(r.Context())
+		http.Redirect(w, r, "/user/login", http.StatusSeeOther)
+		return nil, false
+	}
+
+	return user, true
 }

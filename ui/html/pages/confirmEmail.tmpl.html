@@ -1,0 +1,18 @@
+{{define "title"}}Confirm Email{{end}}
+
+{{define "main"}}
+<form action="/user/confirmEmail" method="POST">
+  {{with .Errors}}
+  <ul>
+    {{range .}}
+    <li>{{.}}</li>
+    {{end}}
+  </ul>
+  {{end}}
+  <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+  <label class="input-label" for="code">Code:</label>
+  <input id="code" type="text" name="code" autocomplete="off">
+  {{with .FieldErrors.Code}}<label class="error-label" for="code">{{.}}</label>{{end}}
+  <input class="btn btn-primary" type="submit" value="Verify">
+</form>
+{{end}}
