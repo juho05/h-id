@@ -1,0 +1,27 @@
+{{define "title"}}Sign up{{end}}
+
+{{define "main"}}
+<form action="/user/signup" method="POST" novalidate>
+  {{with .Errors}}
+  <ul>
+    {{range .}}
+    <li>{{.}}</li>
+    {{end}}
+  </ul>
+  {{end}}
+  <input class="input-label" type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+  <label for="name">Name:</label>
+  <input class="{{if .FieldErrors.name}}invalid-field{{end}}" id="name" type="text" name="name" min="3" max="32" {{with .Form}}value="{{.Name}}"{{end}} required>
+  {{with .FieldErrors.Name}}<label class="error-label" for="name">{{.}}</label>{{end}}
+  <label class="input-label" for="email">Email:</label>
+  <input id="email" type="email" name="email" {{with .Form}}value="{{.Email}}"{{end}} required>
+  {{with .FieldErrors.Email}}<label class="error-label" for="email">{{.}}</label>{{end}}
+  <label for="password">Password:</label>
+  <input class="input-label" id="password" type="password" name="password" minlength="6" required>
+  {{with .FieldErrors.Password}}<label class="error-label" for="password">{{.}}</label>{{end}}
+  <label for="repeatPassword">Repeat password:</label>
+  <input class="input-label" id="repeatPassword" type="password" name="repeatPassword" minlength="6" required>
+  {{with .FieldErrors.RepeatPassword}}<label class="error-label" for="repeatPassword">{{.}}</label>{{end}}
+  <input class="btn btn-primary" type="submit" value="Login">
+</form>
+{{end}}

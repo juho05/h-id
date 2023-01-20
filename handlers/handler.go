@@ -1,17 +1,23 @@
 package handlers
 
 import (
+	"io/fs"
+	"mime"
 	"net/http"
 
+	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
 
 	"github.com/Bananenpro/h-id/services"
 )
 
 type Handler struct {
-	Router      chi.Router
-	AuthService services.AuthService
-	UserService services.UserService
+	Router         chi.Router
+	Renderer       Renderer
+	AuthService    services.AuthService
+	UserService    services.UserService
+	SessionManager *scs.SessionManager
+	StaticFS       fs.FS
 }
 
 func NewHandler() *Handler {
@@ -20,4 +26,9 @@ func NewHandler() *Handler {
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.Router.ServeHTTP(w, r)
+}
+
+func init() {
+	mime.AddExtensionType(".js", "text/javascript")
+	mime.AddExtensionType(".css", "text/css")
 }

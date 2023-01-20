@@ -116,3 +116,31 @@ func DBConnection() (con string) {
 	}
 	return con
 }
+
+func TLSCert() (path string) {
+	if c, ok := values["TLS_CERT"]; ok {
+		return c.(string)
+	}
+	defer func() {
+		values["TLS_CERT"] = path
+	}()
+	path = os.Getenv("TLS_CERT")
+	if path == "" {
+		return ""
+	}
+	return path
+}
+
+func TLSKey() (path string) {
+	if c, ok := values["TLS_KEY"]; ok {
+		return c.(string)
+	}
+	defer func() {
+		values["TLS_KEY"] = path
+	}()
+	path = os.Getenv("TLS_KEY")
+	if path == "" {
+		return ""
+	}
+	return path
+}

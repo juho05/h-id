@@ -1,0 +1,21 @@
+{{define "title"}}Login{{end}}
+
+{{define "main"}}
+<form action="/user/login" method="POST">
+  {{with .Errors}}
+  <ul>
+    {{range .}}
+    <li>{{.}}</li>
+    {{end}}
+  </ul>
+  {{end}}
+  <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+  <label class="input-label" for="email">Email:</label>
+  <input id="email" type="email" name="email" {{with .Form}}value="{{.Email}}"{{end}}>
+  {{with .FieldErrors.Email}}<label class="error-label" for="email">{{.}}</label>{{end}}
+  <label class="input-label" for="password">Password:</label>
+  <input id="password" type="password" name="password">
+  {{with .FieldErrors.Password}}<label class="error-label" for="password">{{.}}</label>{{end}}
+  <input class="btn btn-primary" type="submit" value="Login">
+</form>
+{{end}}

@@ -3,11 +3,13 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"os"
+	"time"
 
 	"github.com/Bananenpro/log"
+	"github.com/alexedwards/scs/v2"
 
-	"github.com/go-chi/chi/v5"
+	hid "github.com/Bananenpro/h-id"
+
 	"github.com/joho/godotenv"
 
 	"github.com/Bananenpro/h-id/config"
@@ -21,22 +23,40 @@ func run() error {
 
 	db, err := sqlite.Connect(config.DBConnection())
 	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
+		return fmt.Errorf("Failed to connect to database:", err)
 	}
 	userRepo := db.NewUserRepository()
 
-	handler.AuthService = services.NewAuthService(userRepo)
+	handler.SessionManager = scs.New()
+	handler.SessionManager.Store = db.NewSessionRepository()
+	handler.SessionManager.Lifetime = 72 * time.Hour
+	handler.SessionManager.IdleTimeout = 12 * time.Hour
+	handler.SessionManager.Cookie.Secure = true
+
+	handler.AuthService = services.NewAuthService(userRepo, handler.SessionManager)
 	handler.UserService = services.NewUserService(userRepo, handler.AuthService)
 
-	handler.Router = chi.NewRouter()
-	handler.RegisterMiddlewares()
+	handler.Renderer, err = handlers.NewRenderer(hid.HTMLFS)
+	if err != nil {
+		return fmt.Errorf("Failed to initialize renderer: %w", err)
+	}
+
+	handler.StaticFS = hid.StaticFS
 	handler.RegisterRoutes()
 
 	port := config.Port()
 
+	cert := config.TLSCert()
+	key := config.TLSKey()
+
 	addr := fmt.Sprintf(":%d", port)
 	log.Infof("Listening on %s...", addr)
-	return http.ListenAndServe(addr, handler)
+
+	if cert != "" && key != "" {
+		return http.ListenAndServeTLS(addr, cert, key, handler)
+	} else {
+		return http.ListenAndServe(addr, handler)
+	}
 }
 
 func main() {
@@ -47,7 +67,6 @@ func main() {
 
 	err := run()
 	if err != nil {
-		log.Errorf("%s", err)
-		os.Exit(1)
+		log.Fatalf("%s", err)
 	}
 }

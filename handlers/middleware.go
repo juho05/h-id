@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/Bananenpro/log"
+	"github.com/justinas/nosurf"
 )
 
 type statusResponseWriter struct {
@@ -62,6 +64,29 @@ func recoverPanic(next http.Handler) http.Handler {
 				serverError(w, fmt.Errorf("%v", err))
 			}
 		}()
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func csrf(next http.Handler) http.Handler {
+	handler := nosurf.New(next)
+	handler.SetBaseCookie(http.Cookie{
+		HttpOnly: true,
+		Path:     "/",
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
+	return handler
+}
+
+func (h *Handler) auth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID := h.SessionManager.GetString(r.Context(), "authUserID")
+		if userID == "" {
+			http.Redirect(w, r, fmt.Sprintf("/user/login?redirect=%s", url.QueryEscape(r.URL.Path)), http.StatusSeeOther)
+			return
+		}
 
 		next.ServeHTTP(w, r)
 	})
