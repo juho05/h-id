@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"runtime/debug"
 	"strconv"
+	"strings"
 
 	"github.com/Bananenpro/log"
 	"github.com/go-playground/form/v4"
@@ -127,7 +128,10 @@ func findInvalidFields(obj any) map[string]string {
 	if ok && len(vErrs) > 0 {
 		fields := make(map[string]string, len(vErrs))
 		for _, e := range vErrs {
-			fields[e.StructField()] = e.Translate(enTrans)
+			name := e.StructField()
+			name = strings.ReplaceAll(name, "[", "")
+			name = strings.ReplaceAll(name, "]", "")
+			fields[name] = e.Translate(enTrans)
 		}
 		return fields
 	}

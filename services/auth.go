@@ -206,6 +206,20 @@ func generateCode(length int) string {
 	return fmt.Sprintf("%v", c)
 }
 
+func generateToken(length int) string {
+	const letters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+	ret := make([]byte, length)
+	for i := 0; i < length; i++ {
+		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
+		if err != nil {
+			panic(err)
+		}
+		ret[i] = letters[num.Int64()]
+	}
+
+	return string(ret)
+}
+
 func hashToken(token string) []byte {
 	return pbkdf2.Key([]byte(token), []byte("salt"), 100000, 64, sha512.New)
 }

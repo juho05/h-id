@@ -1,7 +1,7 @@
 {{define "title"}}Sign up{{end}}
 
 {{define "main"}}
-<form action="/user/signup" method="POST" novalidate>
+<form action="/user/signup" method="POST">
   {{with .Errors}}
   <ul>
     {{range .}}
@@ -9,19 +9,25 @@
     {{end}}
   </ul>
   {{end}}
-  <input class="input-label" type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+  <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
   <label for="name">Name:</label>
-  <input class="{{if .FieldErrors.name}}invalid-field{{end}}" id="name" type="text" name="name" min="3" max="32" {{with .Form}}value="{{.Name}}"{{end}} required>
+  <input class="{{if .FieldErrors.Name}}invalid-field{{end}}" id="name" type="text" name="name" maxlength="32" {{with .Form}}value="{{.Name}}"{{end}} required>
   {{with .FieldErrors.Name}}<label class="error-label" for="name">{{.}}</label>{{end}}
+
   <label class="input-label" for="email">Email:</label>
-  <input id="email" type="email" name="email" {{with .Form}}value="{{.Email}}"{{end}} required>
+  <input class="{{if .FieldErrors.Email}}invalid-field{{end}}" id="email" type="email" name="email" {{with .Form}}value="{{.Email}}"{{end}} required>
   {{with .FieldErrors.Email}}<label class="error-label" for="email">{{.}}</label>{{end}}
-  <label for="password">Password:</label>
-  <input class="input-label" id="password" type="password" name="password" minlength="6" required>
+
+  <label class="input-label" for="password">Password:</label>
+  <input class="{{if .FieldErrors.Password}}invalid-field{{end}}" id="password" type="password" name="password" required>
   {{with .FieldErrors.Password}}<label class="error-label" for="password">{{.}}</label>{{end}}
-  <label for="repeatPassword">Repeat password:</label>
-  <input class="input-label" id="repeatPassword" type="password" name="repeatPassword" minlength="6" required>
+
+  <label class="input-label" for="repeatPassword">Repeat password:</label>
+  <input class="{{if .FieldErrors.RepeatPassword}}invalid-field{{end}}" id="repeatPassword" type="password" name="repeatPassword" required>
   {{with .FieldErrors.RepeatPassword}}<label class="error-label" for="repeatPassword">{{.}}</label>{{end}}
+
   <input class="btn btn-primary" type="submit" value="Login">
 </form>
 {{end}}

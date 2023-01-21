@@ -1,0 +1,29 @@
+{{define "title"}}Create App{{end}}
+
+{{define "main"}}
+<form action="/app/create" method="POST">
+  {{with .Errors}}
+  <ul>
+    {{range .}}
+    <li>{{.}}</li>
+    {{end}}
+  </ul>
+  {{end}}
+
+  <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+  <label class="input-label" for="name">Name:</label>
+  <input class="{{if .FieldErrors.Name}}invalid-field{{end}}" id="name" type="text" name="name" {{with .Form}}value="{{.Name}}"{{end}} required>
+  {{with .FieldErrors.Name}}<label class="error-label" for="name">{{.}}</label>{{end}}
+
+  <label class="input-label" for="description">Description:</label>
+  <textarea class="{{if .FieldErrors.Description}}invalid-field{{end}}" id="description" name="description">{{with .Form}}{{.Description}}{{end}}</textarea>
+  {{with .FieldErrors.Description}}<label class="error-label" for="description">{{.}}</label>{{end}}
+
+  <label class="input-label" for="redirectURI">Redirect URI:</label>
+  <input class="{{if .FieldErrors.RedirectURIs0}}invalid-field{{end}}" id="redirectURI" type="url" name="redirectURIs" {{with .Form}}{{with .RedirectURIs}}value="{{index . 0}}"{{end}}{{end}} required>
+  {{with .FieldErrors.RedirectURIs0}}<label class="error-label" for="redirectURI">{{.}}</label>{{end}}
+
+  <input class="btn btn-primary" type="submit" value="Verify">
+</form>
+{{end}}
