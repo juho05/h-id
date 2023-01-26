@@ -18,6 +18,7 @@ require (
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/xdg-go/pbkdf2 v1.0.0
 	golang.org/x/crypto v0.5.0
+	golang.org/x/exp v0.0.0-20230118134722-a68e582fa157
 )
 
 require (

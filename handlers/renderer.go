@@ -14,6 +14,7 @@ import (
 
 type templateData struct {
 	Form        any
+	Data        any
 	FieldErrors map[string]string
 	Errors      []string
 	CSRFToken   string
@@ -23,6 +24,14 @@ func (h *Handler) newTemplateData(r *http.Request) templateData {
 	return templateData{
 		FieldErrors: make(map[string]string),
 		CSRFToken:   nosurf.Token(r),
+	}
+}
+
+func (h *Handler) newTemplateDataWithData(r *http.Request, data any) templateData {
+	return templateData{
+		FieldErrors: make(map[string]string),
+		CSRFToken:   nosurf.Token(r),
+		Data:        data,
 	}
 }
 

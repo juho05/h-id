@@ -22,13 +22,13 @@ func (d DB) NewTokenRepository() repos.TokenRepository {
 	}
 }
 
-func (t *tokenRepository) Create(ctx context.Context, category repos.TokenCategory, key string, valueHash []byte, duration time.Duration) (*repos.TokenModel, error) {
+func (t *tokenRepository) Create(ctx context.Context, category repos.TokenCategory, key string, valueHash []byte, lifetime time.Duration) (*repos.TokenModel, error) {
 	token := &repos.TokenModel{
 		CreatedAt: time.Now().Unix(),
 		Category:  category,
 		Key:       key,
 		ValueHash: valueHash,
-		Expires:   time.Now().Unix() + int64(duration.Seconds()),
+		Expires:   time.Now().Add(lifetime).Unix(),
 	}
 	_, err := t.db.Exec("REPLACE INTO tokens (created_at, category, token_key, value_hash, expires) VALUES (?, ?, ?, ?, ?)", token.CreatedAt, token.Category, token.Key, token.ValueHash, token.Expires)
 	if err != nil {

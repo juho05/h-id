@@ -20,6 +20,10 @@
   <textarea class="{{if .FieldErrors.Description}}invalid-field{{end}}" id="description" name="description">{{with .Form}}{{.Description}}{{end}}</textarea>
   {{with .FieldErrors.Description}}<label class="error-label" for="description">{{.}}</label>{{end}}
 
+  <label class="input-label" for="website">Website:</label>
+  <input class="{{if .FieldErrors.Website}}invalid-field{{end}}" id="website" type="url" name="website" {{with .Form}}value="{{.Website}}"{{end}} required>
+  {{with .FieldErrors.Website}}<label class="error-label" for="website">{{.}}</label>{{end}}
+
   <label class="input-label" for="redirectURI">Redirect URI:</label>
   <input class="{{if .FieldErrors.RedirectURIs0}}invalid-field{{end}}" id="redirectURI" type="url" name="redirectURIs" {{with .Form}}{{with .RedirectURIs}}value="{{index . 0}}"{{end}}{{end}} required>
   {{with .FieldErrors.RedirectURIs0}}<label class="error-label" for="redirectURI">{{.}}</label>{{end}}

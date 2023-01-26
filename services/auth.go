@@ -5,14 +5,18 @@ import (
 	"crypto/rand"
 	"crypto/sha512"
 	"crypto/subtle"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"io"
 	"math"
 	"math/big"
+	"runtime/debug"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/exp/slices"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/xdg-go/pbkdf2"
@@ -32,6 +36,15 @@ type AuthService interface {
 	IsEmailConfirmed(ctx context.Context, id string) (bool, error)
 	SendConfirmEmail(ctx context.Context, user *repos.UserModel) error
 	ConfirmEmail(ctx context.Context, userID, code string) error
+
+	StartOAuthCodeFlow(ctx context.Context, clientID, redirectURI, responseType, scope, state string) error
+	GetAuthRequest(ctx context.Context) (AuthRequest, error)
+	OAuthConsent(ctx context.Context) (string, error)
+	OAuthTokensByCode(ctx context.Context, clientID, clientSecret, redirectURI, code string) (access string, refresh string, err error)
+	VerifyClientCredentials(ctx context.Context, clientID, clientSecret string) error
+	RevokeOAuthTokens(ctx context.Context, clientID, userID string) error
+
+	DescribeScopes(scopes []string) []string
 }
 
 func init() {
@@ -41,22 +54,158 @@ func init() {
 	if err != nil {
 		log.Fatalf("crypto/rand is unavailable: Read() failed with %#v", err)
 	}
+
+	gob.Register(AuthRequest{})
 }
 
 type authService struct {
 	userRepo       repos.UserRepository
+	clientRepo     repos.ClientRepository
 	tokenRepo      repos.TokenRepository
+	oauthRepo      repos.OAuthRepository
 	sessionManager *scs.SessionManager
 	emailService   EmailService
 }
 
-func NewAuthService(userRepository repos.UserRepository, tokenRepository repos.TokenRepository, sessionManager *scs.SessionManager, emailService EmailService) AuthService {
+type AuthRequest struct {
+	ClientID    string
+	RedirectURI string
+	Scopes      []string
+	State       string
+}
+
+func NewAuthService(userRepository repos.UserRepository, tokenRepository repos.TokenRepository, oauthRepository repos.OAuthRepository, clientRepository repos.ClientRepository, sessionManager *scs.SessionManager, emailService EmailService) AuthService {
 	return &authService{
 		userRepo:       userRepository,
 		tokenRepo:      tokenRepository,
+		oauthRepo:      oauthRepository,
+		clientRepo:     clientRepository,
 		sessionManager: sessionManager,
 		emailService:   emailService,
 	}
+}
+
+func (a *authService) StartOAuthCodeFlow(ctx context.Context, clientID, redirectURI, responseType, scope, state string) error {
+	client, err := a.clientRepo.Find(ctx, clientID)
+	if err != nil {
+		return fmt.Errorf("start OAuth code flow: %w", err)
+	}
+
+	if !slices.Contains(client.RedirectURIs, redirectURI) {
+		return ErrInvalidRedirectURI
+	}
+
+	if responseType != "code" {
+		return ErrUnsupportedResponseType
+	}
+
+	scopes := strings.Split(scope, " ")
+	for _, s := range scopes {
+		if s != "openid" && s != "profile" && s != "email" {
+			return fmt.Errorf("%w: %s", ErrInvalidScope, s)
+		}
+	}
+
+	a.sessionManager.Put(ctx, "authRequest", AuthRequest{
+		ClientID:    clientID,
+		RedirectURI: redirectURI,
+		Scopes:      scopes,
+		State:       state,
+	})
+
+	return nil
+}
+
+func (a *authService) GetAuthRequest(ctx context.Context) (AuthRequest, error) {
+	req, ok := a.sessionManager.Get(ctx, "authRequest").(AuthRequest)
+	if !ok {
+		return AuthRequest{}, ErrMissingRequiredSessionData
+	}
+	return req, nil
+}
+
+func (a *authService) OAuthConsent(ctx context.Context) (string, error) {
+	req, err := a.GetAuthRequest(ctx)
+	if err != nil {
+		return "", fmt.Errorf("OAuth consent: %w", err)
+	}
+	code := generateToken(64)
+	codeHash := hashTokenWeak(code)
+
+	_, err = a.oauthRepo.Create(ctx, req.ClientID, a.AuthenticatedUserID(ctx), repos.OAuthTokenCode, codeHash, req.RedirectURI, req.Scopes, 5*time.Minute)
+	if err != nil {
+		return "", fmt.Errorf("OAuth consent: %w", err)
+	}
+	return code, nil
+}
+
+func (a *authService) OAuthTokensByCode(ctx context.Context, clientID, clientSecret, redirectURI, code string) (string, string, error) {
+	if err := a.VerifyClientCredentials(ctx, clientID, clientSecret); err != nil {
+		return "", "", fmt.Errorf("oauth tokens by code: %w", err)
+	}
+
+	token, err := a.oauthRepo.Find(ctx, clientID, repos.OAuthTokenCode, hashTokenWeak(code))
+	if err != nil {
+		if errors.Is(err, repos.ErrNoRecord) {
+			err = ErrInvalidGrant
+		}
+		return "", "", fmt.Errorf("oauth tokens by code: %w", err)
+	}
+	if token.Used {
+		err = a.RevokeOAuthTokens(ctx, clientID, token.UserID)
+		if err != nil {
+			log.Errorf("%s\n%s", fmt.Sprintf("oauth tokens by code: %s", err), debug.Stack())
+		}
+		return "", "", ErrReusedToken
+	}
+
+	if token.RedirectURI != redirectURI {
+		return "", "", fmt.Errorf("oauth tokens by code: %w", ErrInvalidRedirectURI)
+	}
+
+	err = a.oauthRepo.Use(ctx, clientID, repos.OAuthTokenCode, token.TokenHash)
+	if err != nil {
+		return "", "", fmt.Errorf("oauth tokens by code: %w", err)
+	}
+
+	access := generateToken(64)
+	accessHash := hashTokenWeak(access)
+	refresh := generateToken(128)
+	refreshHash := hashToken(refresh)
+
+	_, err = a.oauthRepo.Create(ctx, token.ClientID, token.UserID, repos.OAuthTokenAccess, accessHash, token.RedirectURI, token.Scopes, 30*time.Minute)
+	if err != nil {
+		return "", "", fmt.Errorf("oauth tokens by code: %w", err)
+	}
+
+	_, err = a.oauthRepo.Create(ctx, token.ClientID, token.UserID, repos.OAuthTokenRefresh, refreshHash, token.RedirectURI, token.Scopes, 12*7*24*time.Hour)
+	if err != nil {
+		return "", "", fmt.Errorf("oauth tokens by code: %w", err)
+	}
+
+	return access, refresh, nil
+}
+
+func (a *authService) VerifyClientCredentials(ctx context.Context, clientID, clientSecret string) error {
+	client, err := a.clientRepo.Find(ctx, clientID)
+	if err != nil {
+		if errors.Is(err, repos.ErrNoRecord) {
+			err = ErrInvalidCredentials
+		}
+		return fmt.Errorf("verify client credentials: %w", err)
+	}
+	if string(hashToken(clientSecret)) != string(client.SecretHash) {
+		return ErrInvalidCredentials
+	}
+	return nil
+}
+
+func (a *authService) RevokeOAuthTokens(ctx context.Context, clientID, userID string) error {
+	err := a.oauthRepo.DeleteByUser(ctx, clientID, userID)
+	if err != nil {
+		return fmt.Errorf("revoke OAuth tokens: %w", err)
+	}
+	return nil
 }
 
 func (a *authService) SendConfirmEmail(ctx context.Context, user *repos.UserModel) error {
@@ -222,4 +371,25 @@ func generateToken(length int) string {
 
 func hashToken(token string) []byte {
 	return pbkdf2.Key([]byte(token), []byte("salt"), 100000, 64, sha512.New)
+}
+
+func hashTokenWeak(token string) []byte {
+	return pbkdf2.Key([]byte(token), []byte("salt"), 10000, 64, sha512.New)
+}
+
+func (a *authService) DescribeScopes(scopes []string) []string {
+	descriptions := make([]string, 0, len(scopes))
+	for _, s := range scopes {
+		// [...] requests permission to:
+		switch s {
+		case "openid":
+		case "profile":
+			descriptions = append(descriptions, "View user and account information")
+		case "email":
+			descriptions = append(descriptions, "View your email address")
+		default:
+			descriptions = append(descriptions, s)
+		}
+	}
+	return descriptions
 }

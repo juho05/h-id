@@ -27,7 +27,8 @@ func run() error {
 	}
 	userRepo := db.NewUserRepository()
 	tokenRepo := db.NewTokenRepository()
-	clientRepository := db.NewClientRepository()
+	clientRepo := db.NewClientRepository()
+	oauthRepo := db.NewOAuthRepository()
 
 	handler.SessionManager = scs.New()
 	handler.SessionManager.Store = db.NewSessionRepository()
@@ -37,8 +38,9 @@ func run() error {
 
 	emailService := services.NewEmailService(hid.EmailFS)
 
-	handler.AuthService = services.NewAuthService(userRepo, tokenRepo, handler.SessionManager, emailService)
-	handler.UserService = services.NewUserService(userRepo, clientRepository, handler.AuthService)
+	handler.AuthService = services.NewAuthService(userRepo, tokenRepo, oauthRepo, clientRepo, handler.SessionManager, emailService)
+	handler.UserService = services.NewUserService(userRepo, handler.AuthService)
+	handler.ClientService = services.NewClientService(clientRepo)
 
 	handler.Renderer, err = handlers.NewRenderer(hid.HTMLFS)
 	if err != nil {

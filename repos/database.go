@@ -11,6 +11,7 @@ type DB interface {
 	NewSessionRepository() SessionRepository
 	NewTokenRepository() TokenRepository
 	NewClientRepository() ClientRepository
+	NewOAuthRepository() OAuthRepository
 }
 
 type Transaction interface {

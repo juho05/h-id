@@ -11,63 +11,18 @@ type UserService interface {
 	Find(ctx context.Context, id string) (*repos.UserModel, error)
 	Create(ctx context.Context, name, email, password string) (*repos.UserModel, error)
 	Delete(ctx context.Context, id, password string) error
-
-	FindClient(ctx context.Context, userID, clientID string) (*repos.ClientModel, error)
-	FindClients(ctx context.Context, userID string) ([]*repos.ClientModel, error)
-	CreateClient(ctx context.Context, userID, name, description string, redirectURIs []string) (*repos.ClientModel, string, error)
-	UpdateClient(ctx context.Context, userID, clientID, name, description string, redirectURIs []string) error
-	ClientRotateSecret(ctx context.Context, userID, clientID string) (string, error)
-	DeleteClient(ctx context.Context, userID, clientID string) error
 }
 
 type userService struct {
 	userRepo    repos.UserRepository
-	clientRepo  repos.ClientRepository
 	authService AuthService
 }
 
-func NewUserService(userRepository repos.UserRepository, clientRepository repos.ClientRepository, authService AuthService) UserService {
+func NewUserService(userRepository repos.UserRepository, authService AuthService) UserService {
 	return &userService{
 		userRepo:    userRepository,
-		clientRepo:  clientRepository,
 		authService: authService,
 	}
-}
-
-func (u *userService) FindClient(ctx context.Context, userID, clientID string) (*repos.ClientModel, error) {
-	return u.clientRepo.Find(ctx, userID, clientID)
-}
-
-func (u *userService) FindClients(ctx context.Context, userID string) ([]*repos.ClientModel, error) {
-	return u.clientRepo.FindByUserID(ctx, userID)
-}
-
-func (u *userService) CreateClient(ctx context.Context, userID, name, description string, redirectURIs []string) (*repos.ClientModel, string, error) {
-	secret := generateToken(64)
-	secretHash := hashToken(secret)
-	client, err := u.clientRepo.Create(ctx, userID, name, description, redirectURIs, secretHash)
-	if err != nil {
-		return nil, "", fmt.Errorf("create client: %w", err)
-	}
-	return client, secret, nil
-}
-
-func (u *userService) UpdateClient(ctx context.Context, userID, clientID, name, description string, redirectURIs []string) error {
-	return u.clientRepo.Update(ctx, userID, clientID, name, description, redirectURIs)
-}
-
-func (u *userService) ClientRotateSecret(ctx context.Context, userID, clientID string) (string, error) {
-	secret := generateToken(64)
-	secretHash := hashToken(secret)
-	err := u.clientRepo.UpdateSecret(ctx, userID, clientID, secretHash)
-	if err != nil {
-		return "", fmt.Errorf("rotate client secret: %w", err)
-	}
-	return secret, nil
-}
-
-func (u *userService) DeleteClient(ctx context.Context, userID, clientID string) error {
-	return u.clientRepo.Delete(ctx, userID, clientID)
 }
 
 func (u *userService) Find(ctx context.Context, id string) (*repos.UserModel, error) {

@@ -16,6 +16,7 @@ type Handler struct {
 	Renderer       Renderer
 	AuthService    services.AuthService
 	UserService    services.UserService
+	ClientService  services.ClientService
 	SessionManager *scs.SessionManager
 	StaticFS       fs.FS
 }

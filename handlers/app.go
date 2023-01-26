@@ -24,6 +24,7 @@ func (h *Handler) appCreate(w http.ResponseWriter, r *http.Request) {
 	type request struct {
 		Name         string   `form:"name" validate:"required,notblank,min=3,max=32"`
 		Description  string   `form:"description" validate:"max=512"`
+		Website      string   `form:"website" validate:"required,notblank,url"`
 		RedirectURIs []string `form:"redirectURIs" validate:"required,min=1,dive,required,notblank,url"`
 	}
 
@@ -33,7 +34,7 @@ func (h *Handler) appCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := h.AuthService.AuthenticatedUserID(r.Context())
-	client, secret, err := h.UserService.CreateClient(r.Context(), userID, body.Name, body.Description, body.RedirectURIs)
+	client, secret, err := h.ClientService.Create(r.Context(), userID, body.Name, body.Description, body.Website, body.RedirectURIs)
 	if err != nil {
 		serverError(w, err)
 		return
@@ -46,7 +47,7 @@ func (h *Handler) appCreate(w http.ResponseWriter, r *http.Request) {
 // GET /app/list
 func (h *Handler) appList(w http.ResponseWriter, r *http.Request) {
 	userID := h.AuthService.AuthenticatedUserID(r.Context())
-	clients, err := h.UserService.FindClients(r.Context(), userID)
+	clients, err := h.ClientService.FindByUser(r.Context(), userID)
 	if err != nil {
 		serverError(w, err)
 		return
@@ -69,7 +70,7 @@ func (h *Handler) appList(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) appGet(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	userID := h.AuthService.AuthenticatedUserID(r.Context())
-	client, err := h.UserService.FindClient(r.Context(), userID, id)
+	client, err := h.ClientService.FindByUserAndID(r.Context(), userID, id)
 	if err != nil {
 		if errors.Is(err, repos.ErrNoRecord) {
 			clientError(w, http.StatusNotFound)

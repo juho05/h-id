@@ -18,7 +18,7 @@ type TokenModel struct {
 }
 
 type TokenRepository interface {
-	Create(ctx context.Context, category TokenCategory, key string, valueHash []byte, duration time.Duration) (*TokenModel, error)
+	Create(ctx context.Context, category TokenCategory, key string, valueHash []byte, lifetime time.Duration) (*TokenModel, error)
 	Find(ctx context.Context, category TokenCategory, key string) (*TokenModel, error)
 	Delete(ctx context.Context, category TokenCategory, key string) error
 }

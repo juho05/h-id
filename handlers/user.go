@@ -62,16 +62,13 @@ func (h *Handler) userSignUp(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) userLoginPage(w http.ResponseWriter, r *http.Request) {
 	if redirect := r.URL.Query().Get("redirect"); redirect != "" {
-		redirectUnescaped, err := url.QueryUnescape(redirect)
+		u, err := url.Parse(redirect)
 		if err == nil {
-			u, err := url.Parse(redirectUnescaped)
-			if err == nil {
-				if u.IsAbs() {
-					clientError(w, http.StatusBadRequest)
-					return
-				}
-				h.SessionManager.Put(r.Context(), "loginRedirect", "/"+strings.TrimPrefix(redirectUnescaped, "/"))
+			if u.IsAbs() {
+				clientError(w, http.StatusBadRequest)
+				return
 			}
+			h.SessionManager.Put(r.Context(), "loginRedirect", "/"+strings.TrimPrefix(redirect, "/"))
 		}
 	} else {
 		h.SessionManager.Remove(r.Context(), "loginRedirect")
@@ -113,16 +110,13 @@ func (h *Handler) userLogin(w http.ResponseWriter, r *http.Request) {
 // GET /user/confirmEmail
 func (h *Handler) userConfirmEmailPage(w http.ResponseWriter, r *http.Request) {
 	if redirect := r.URL.Query().Get("redirect"); redirect != "" {
-		redirectUnescaped, err := url.QueryUnescape(redirect)
+		u, err := url.Parse(redirect)
 		if err == nil {
-			u, err := url.Parse(redirectUnescaped)
-			if err == nil {
-				if u.IsAbs() {
-					clientError(w, http.StatusBadRequest)
-					return
-				}
-				h.SessionManager.Put(r.Context(), "confirmEmailRedirect", "/"+strings.TrimPrefix(redirectUnescaped, "/"))
+			if u.IsAbs() {
+				clientError(w, http.StatusBadRequest)
+				return
 			}
+			h.SessionManager.Put(r.Context(), "confirmEmailRedirect", "/"+strings.TrimPrefix(redirect, "/"))
 		}
 	} else {
 		h.SessionManager.Remove(r.Context(), "confirmEmailRedirect")

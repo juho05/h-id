@@ -4,6 +4,7 @@ CREATE TABLE clients (
 	created_at INTEGER NOT NULL,
 	name TEXT NOT NULL,
 	description TEXT NOT NULL,
+	website TEXT NOT NULL,
 	redirect_uris TEXT NOT NULL,
 	secret_hash BLOB NOT NULL,
 	user_id TEXT NOT NULL,

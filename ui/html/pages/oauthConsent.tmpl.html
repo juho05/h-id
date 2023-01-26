@@ -1,0 +1,23 @@
+{{define "title"}}OAuth Consent{{end}}
+
+{{define "main"}}
+<h3><b><a href="{{.Data.ClientWebsite}}">{{.Data.ClientName}}</a></b> requests permission to:</h3>
+<ul>
+  {{range .Data.Scopes}}
+  <li>{{.}}</li>
+  {{end}}
+</ul>
+<form action="/oauth/consent" method="POST">
+  {{with .Errors}}
+  <ul>
+    {{range .}}
+    <li>{{.}}</li>
+    {{end}}
+  </ul>
+  {{end}}
+
+  <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+  <button class="btn btn-secondary" type="submit" name="choice" value="deny">Deny</button>
+  <button class="btn btn-primary" type="submit" name="choice" value="accept">Accept</button>
+</form>
+{{end}}

@@ -191,3 +191,8 @@ func (h *Handler) authUser(w http.ResponseWriter, r *http.Request) (user *repos.
 
 	return user, true
 }
+
+func noCache(w http.ResponseWriter) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
+}
