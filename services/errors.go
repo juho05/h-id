@@ -11,4 +11,5 @@ var (
 	ErrMissingRequiredSessionData = errors.New("missing-required-session-data")
 	ErrReusedToken                = errors.New("reused-token")
 	ErrInvalidGrant               = errors.New("invalid-grant")
+	ErrUnsupportedGrantType       = errors.New("unsupported-grant-type")
 )

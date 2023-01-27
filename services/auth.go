@@ -40,7 +40,7 @@ type AuthService interface {
 	StartOAuthCodeFlow(ctx context.Context, clientID, redirectURI, responseType, scope, state string) error
 	GetAuthRequest(ctx context.Context) (AuthRequest, error)
 	OAuthConsent(ctx context.Context) (string, error)
-	OAuthTokensByCode(ctx context.Context, clientID, clientSecret, redirectURI, code string) (access string, refresh string, err error)
+	OAuthGenerateTokens(ctx context.Context, clientID, clientSecret, redirectURI, grantType, grant string) (access string, refresh string, err error)
 	VerifyClientCredentials(ctx context.Context, clientID, clientSecret string) error
 	RevokeOAuthTokens(ctx context.Context, clientID, userID string) error
 
@@ -139,33 +139,46 @@ func (a *authService) OAuthConsent(ctx context.Context) (string, error) {
 	return code, nil
 }
 
-func (a *authService) OAuthTokensByCode(ctx context.Context, clientID, clientSecret, redirectURI, code string) (string, string, error) {
+func (a *authService) OAuthGenerateTokens(ctx context.Context, clientID, clientSecret, redirectURI, grantType, grant string) (string, string, error) {
 	if err := a.VerifyClientCredentials(ctx, clientID, clientSecret); err != nil {
-		return "", "", fmt.Errorf("oauth tokens by code: %w", err)
+		return "", "", fmt.Errorf("oauth generate tokens: %w", err)
 	}
 
-	token, err := a.oauthRepo.Find(ctx, clientID, repos.OAuthTokenCode, hashTokenWeak(code))
+	var hash []byte
+	var tokenType repos.OAuthTokenCategory
+	switch grantType {
+	case "authorization_code":
+		hash = hashTokenWeak(grant)
+		tokenType = repos.OAuthTokenCode
+	case "refresh_token":
+		hash = hashToken(grant)
+		tokenType = repos.OAuthTokenRefresh
+	default:
+		return "", "", ErrUnsupportedGrantType
+	}
+
+	token, err := a.oauthRepo.Find(ctx, clientID, tokenType, hash)
 	if err != nil {
 		if errors.Is(err, repos.ErrNoRecord) {
 			err = ErrInvalidGrant
 		}
-		return "", "", fmt.Errorf("oauth tokens by code: %w", err)
+		return "", "", fmt.Errorf("oauth generate tokens: %w", err)
 	}
 	if token.Used {
 		err = a.RevokeOAuthTokens(ctx, clientID, token.UserID)
 		if err != nil {
-			log.Errorf("%s\n%s", fmt.Sprintf("oauth tokens by code: %s", err), debug.Stack())
+			log.Errorf("%s\n%s", fmt.Sprintf("oauth generate tokens: %s", err), debug.Stack())
 		}
 		return "", "", ErrReusedToken
 	}
 
-	if token.RedirectURI != redirectURI {
-		return "", "", fmt.Errorf("oauth tokens by code: %w", ErrInvalidRedirectURI)
+	if grantType != "refresh_token" && token.RedirectURI != redirectURI {
+		return "", "", fmt.Errorf("oauth generate tokens: %w", ErrInvalidRedirectURI)
 	}
 
-	err = a.oauthRepo.Use(ctx, clientID, repos.OAuthTokenCode, token.TokenHash)
+	err = a.oauthRepo.Use(ctx, clientID, tokenType, token.TokenHash)
 	if err != nil {
-		return "", "", fmt.Errorf("oauth tokens by code: %w", err)
+		return "", "", fmt.Errorf("oauth generate tokens: %w", err)
 	}
 
 	access := generateToken(64)
@@ -173,12 +186,12 @@ func (a *authService) OAuthTokensByCode(ctx context.Context, clientID, clientSec
 	refresh := generateToken(128)
 	refreshHash := hashToken(refresh)
 
-	_, err = a.oauthRepo.Create(ctx, token.ClientID, token.UserID, repos.OAuthTokenAccess, accessHash, token.RedirectURI, token.Scopes, 30*time.Minute)
+	_, err = a.oauthRepo.Create(ctx, token.ClientID, token.UserID, repos.OAuthTokenAccess, accessHash, "", token.Scopes, 30*time.Minute)
 	if err != nil {
 		return "", "", fmt.Errorf("oauth tokens by code: %w", err)
 	}
 
-	_, err = a.oauthRepo.Create(ctx, token.ClientID, token.UserID, repos.OAuthTokenRefresh, refreshHash, token.RedirectURI, token.Scopes, 12*7*24*time.Hour)
+	_, err = a.oauthRepo.Create(ctx, token.ClientID, token.UserID, repos.OAuthTokenRefresh, refreshHash, "", token.Scopes, 12*7*24*time.Hour)
 	if err != nil {
 		return "", "", fmt.Errorf("oauth tokens by code: %w", err)
 	}

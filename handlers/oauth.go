@@ -182,19 +182,21 @@ func (h *Handler) oauthToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var access string
-	var refresh string
+	var grant string
 	switch data.GrantType {
 	case "authorization_code":
-		access, refresh, err = h.AuthService.OAuthTokensByCode(r.Context(), clientID, clientSecret, data.RedirectURI, data.Code)
-	default:
-		respondJSONError(w, errors.New("unsupported_grant_type"), http.StatusBadRequest)
-		return
+		grant = data.Code
+	case "refresh_token":
+		grant = data.RefreshToken
 	}
+
+	access, refresh, err := h.AuthService.OAuthGenerateTokens(r.Context(), clientID, clientSecret, data.RedirectURI, data.GrantType, grant)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidCredentials) {
 			w.Header().Set("WWW-Authenticate", "Basic realm=\"client authentication\"")
 			respondJSONError(w, errors.New("invalid_client"), http.StatusUnauthorized)
+		} else if errors.Is(err, services.ErrUnsupportedGrantType) {
+			respondJSONError(w, errors.New("unsupported_grant_type"), http.StatusBadRequest)
 		} else if errors.Is(err, services.ErrInvalidGrant) || errors.Is(err, services.ErrReusedToken) {
 			respondJSONError(w, errors.New("invalid_grant"), http.StatusBadRequest)
 		} else if errors.Is(err, services.ErrInvalidRedirectURI) {
