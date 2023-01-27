@@ -21,7 +21,7 @@ sql-migrate up
 ### Run the webserver
 
 ```sh
-go run ./cmd/h-id
+go run ./cmd/web
 ```
 
 ## License
