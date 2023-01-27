@@ -7,6 +7,7 @@ CREATE TABLE oauth (
 	redirect_uri TEXT NOT NULL,
 	user_id TEXT NOT NULL,
 	scopes TEXT NOT NULL,
+	data BLOB,
 	expires INTEGER NOT NULL,
 	used INTEGER NOT NULL,
 

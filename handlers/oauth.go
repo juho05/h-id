@@ -1,13 +1,18 @@
 package handlers
 
 import (
+	"crypto/sha1"
+	"crypto/x509"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
 	"net/url"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/Bananenpro/h-id/config"
 	"github.com/Bananenpro/h-id/repos"
 	"github.com/Bananenpro/h-id/services"
 )
@@ -16,6 +21,9 @@ func (h *Handler) oauthRoutes(r chi.Router) {
 	r.With(h.auth).Get("/auth", h.oauthAuth)
 	r.With(h.auth).Get("/consent", h.oauthConsentPage)
 	r.With(h.auth).Post("/consent", h.oauthConsent)
+
+	r.Get("/certs", h.oauthCerts)
+
 	r.Post("/token", h.oauthToken)
 }
 
@@ -25,6 +33,7 @@ func (h *Handler) oauthAuth(w http.ResponseWriter, r *http.Request) {
 	scope := r.URL.Query().Get("scope")
 	responseType := r.URL.Query().Get("response_type")
 	state := r.URL.Query().Get("state")
+	nonce := r.URL.Query().Get("nonce")
 
 	if clientID == "" || redirectURI == "" || responseType == "" {
 		clientError(w, http.StatusBadRequest)
@@ -37,7 +46,7 @@ func (h *Handler) oauthAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.AuthService.StartOAuthCodeFlow(r.Context(), clientID, redirectURI, responseType, scope, state)
+	err = h.AuthService.StartOAuthCodeFlow(r.Context(), clientID, redirectURI, responseType, scope, state, nonce)
 	if err != nil {
 		if errors.Is(err, repos.ErrNoRecord) {
 			clientError(w, http.StatusNotFound)
@@ -190,7 +199,7 @@ func (h *Handler) oauthToken(w http.ResponseWriter, r *http.Request) {
 		grant = data.RefreshToken
 	}
 
-	access, refresh, err := h.AuthService.OAuthGenerateTokens(r.Context(), clientID, clientSecret, data.RedirectURI, data.GrantType, grant)
+	access, refresh, id, err := h.AuthService.OAuthGenerateTokens(r.Context(), clientID, clientSecret, data.RedirectURI, data.GrantType, grant)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidCredentials) {
 			w.Header().Set("WWW-Authenticate", "Basic realm=\"client authentication\"")
@@ -211,10 +220,48 @@ func (h *Handler) oauthToken(w http.ResponseWriter, r *http.Request) {
 		TokenType    string `json:"token_type"`
 		AccessToken  string `json:"access_token"`
 		RefreshToken string `json:"refresh_token"`
+		IDToken      string `json:"id_token,omitempty"`
 	}
 	respondJSON(w, http.StatusOK, response{
 		TokenType:    "bearer",
 		AccessToken:  access,
 		RefreshToken: refresh,
+		IDToken:      id,
 	})
+}
+
+func (h *Handler) oauthCerts(w http.ResponseWriter, r *http.Request) {
+	type key struct {
+		Type      string `json:"kty"`
+		Use       string `json:"use"`
+		Algorithm string `json:"alg"`
+		ID        string `json:"kid"`
+		N         string `json:"n"`
+		E         string `json:"e"`
+	}
+	type response struct {
+		Keys []key `json:"keys"`
+	}
+
+	pubKey := config.JWTPublicKey()
+
+	n := base64.URLEncoding.EncodeToString(pubKey.N.Bytes())
+	e := base64.URLEncoding.EncodeToString(big.NewInt(int64(pubKey.E)).Bytes())
+
+	idHash := sha1.Sum(x509.MarshalPKCS1PublicKey(pubKey))
+	kid := base64.URLEncoding.EncodeToString(idHash[:])
+
+	resp := response{
+		Keys: []key{
+			{
+				Type:      "RSA",
+				Use:       "sig",
+				Algorithm: "RS256",
+				ID:        kid,
+				N:         n,
+				E:         e,
+			},
+		},
+	}
+	respondJSON(w, http.StatusOK, resp)
 }

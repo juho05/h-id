@@ -1,11 +1,13 @@
 package config
 
 import (
+	"crypto/rsa"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/Bananenpro/log"
+	"github.com/golang-jwt/jwt/v4"
 )
 
 var values = make(map[string]any)
@@ -152,12 +154,12 @@ func EmailUsername() (username string) {
 	return os.Getenv("EMAIL_USERNAME")
 }
 
-func EmailPassword() (username string) {
+func EmailPassword() (password string) {
 	if n, ok := values["EMAIL_PASSWORD"]; ok {
 		return n.(string)
 	}
 	defer func() {
-		values["EMAIL_PASSWORD"] = username
+		values["EMAIL_PASSWORD"] = password
 	}()
 	return os.Getenv("EMAIL_PASSWORD")
 }
@@ -174,4 +176,69 @@ func EmailHost() (host string) {
 		host += ":587"
 	}
 	return host
+}
+
+func JWTPublicKey() (pubKey *rsa.PublicKey) {
+	if k, ok := values["JWT_PUBLIC_KEY"]; ok {
+		return k.(*rsa.PublicKey)
+	}
+	defer func() {
+		values["JWT_PUBLIC_KEY"] = pubKey
+	}()
+	path := os.Getenv("JWT_PUBLIC_KEY")
+	if path == "" {
+		log.Fatal("No JWT secret specified. Please set the JWT_PUBLIC_KEY environment variable to a valid RSA key PEM file.")
+	}
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		log.Fatalf("Failed to read '%s': %w", path, err)
+	}
+
+	pubKey, err = jwt.ParseRSAPublicKeyFromPEM(content)
+	if err != nil {
+		log.Fatalf("Failed to parse '%s': %w", path, err)
+	}
+
+	return pubKey
+}
+
+func JWTPrivateKey() (privKey *rsa.PrivateKey) {
+	if k, ok := values["JWT_PRIVATE_KEY"]; ok {
+		return k.(*rsa.PrivateKey)
+	}
+	defer func() {
+		values["JWT_PRIVATE_KEY"] = privKey
+	}()
+	path := os.Getenv("JWT_PRIVATE_KEY")
+	if path == "" {
+		log.Fatal("No JWT secret specified. Please set the JWT_PRIVATE_KEY environment variable to a valid RSA key PEM file.")
+	}
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		log.Fatalf("Failed to read '%s': %w", path, err)
+	}
+
+	if password := JWTPrivateKeyPassword(); password != "" {
+		privKey, err = jwt.ParseRSAPrivateKeyFromPEMWithPassword(content, password)
+	} else {
+		privKey, err = jwt.ParseRSAPrivateKeyFromPEM(content)
+		log.Warn("The JWT secret key is not password protected. To increase security consider protecting it with a password.")
+	}
+	if err != nil {
+		log.Fatalf("Failed to parse '%s': %w", path, err)
+	}
+
+	return privKey
+}
+
+func JWTPrivateKeyPassword() (password string) {
+	if n, ok := values["JWT_PRIVATE_KEY_PASSWORD"]; ok {
+		return n.(string)
+	}
+	defer func() {
+		values["JWT_PRIVATE_KEY_PASSWORD"] = password
+	}()
+	return os.Getenv("JWT_PRIVATE_KEY_PASSWORD")
 }

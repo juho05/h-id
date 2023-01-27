@@ -22,7 +22,7 @@ func (d *DB) NewOAuthRepository() repos.OAuthRepository {
 	}
 }
 
-func (a *oauthRepository) Create(ctx context.Context, clientID, userID string, category repos.OAuthTokenCategory, tokenHash []byte, redirectURI string, scopes []string, lifetime time.Duration) (*repos.OAuthTokenModel, error) {
+func (a *oauthRepository) Create(ctx context.Context, clientID, userID string, category repos.OAuthTokenCategory, tokenHash []byte, redirectURI string, scopes []string, data []byte, lifetime time.Duration) (*repos.OAuthTokenModel, error) {
 	token := &repos.OAuthTokenModel{
 		CreatedAt:   time.Now().Unix(),
 		Category:    category,
@@ -31,10 +31,11 @@ func (a *oauthRepository) Create(ctx context.Context, clientID, userID string, c
 		ClientID:    clientID,
 		UserID:      userID,
 		Scopes:      scopes,
+		Data:        data,
 		Expires:     time.Now().Add(lifetime).Unix(),
 		Used:        false,
 	}
-	_, err := a.db.ExecContext(ctx, "INSERT INTO oauth (created_at, category, token_hash, redirect_uri, client_id, user_id, scopes, expires, used) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", token.CreatedAt, token.Category, token.TokenHash, token.RedirectURI, token.ClientID, token.UserID, token.Scopes, token.Expires, token.Used)
+	_, err := a.db.ExecContext(ctx, "INSERT INTO oauth (created_at, category, token_hash, redirect_uri, client_id, user_id, scopes, data, expires, used) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", token.CreatedAt, token.Category, token.TokenHash, token.RedirectURI, token.ClientID, token.UserID, token.Scopes, token.Data, token.Expires, token.Used)
 	if err != nil {
 		return nil, fmt.Errorf("create OAuth token: %w", err)
 	}

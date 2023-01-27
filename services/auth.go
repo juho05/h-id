@@ -19,6 +19,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/alexedwards/scs/v2"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/xdg-go/pbkdf2"
 
 	"github.com/Bananenpro/log"
@@ -37,10 +38,10 @@ type AuthService interface {
 	SendConfirmEmail(ctx context.Context, user *repos.UserModel) error
 	ConfirmEmail(ctx context.Context, userID, code string) error
 
-	StartOAuthCodeFlow(ctx context.Context, clientID, redirectURI, responseType, scope, state string) error
+	StartOAuthCodeFlow(ctx context.Context, clientID, redirectURI, responseType, scope, state, nonce string) error
 	GetAuthRequest(ctx context.Context) (AuthRequest, error)
 	OAuthConsent(ctx context.Context) (string, error)
-	OAuthGenerateTokens(ctx context.Context, clientID, clientSecret, redirectURI, grantType, grant string) (access string, refresh string, err error)
+	OAuthGenerateTokens(ctx context.Context, clientID, clientSecret, redirectURI, grantType, grant string) (access string, refresh string, id string, err error)
 	VerifyClientCredentials(ctx context.Context, clientID, clientSecret string) error
 	RevokeOAuthTokens(ctx context.Context, clientID, userID string) error
 
@@ -72,6 +73,7 @@ type AuthRequest struct {
 	RedirectURI string
 	Scopes      []string
 	State       string
+	Nonce       string
 }
 
 func NewAuthService(userRepository repos.UserRepository, tokenRepository repos.TokenRepository, oauthRepository repos.OAuthRepository, clientRepository repos.ClientRepository, sessionManager *scs.SessionManager, emailService EmailService) AuthService {
@@ -85,7 +87,7 @@ func NewAuthService(userRepository repos.UserRepository, tokenRepository repos.T
 	}
 }
 
-func (a *authService) StartOAuthCodeFlow(ctx context.Context, clientID, redirectURI, responseType, scope, state string) error {
+func (a *authService) StartOAuthCodeFlow(ctx context.Context, clientID, redirectURI, responseType, scope, state, nonce string) error {
 	client, err := a.clientRepo.Find(ctx, clientID)
 	if err != nil {
 		return fmt.Errorf("start OAuth code flow: %w", err)
@@ -111,6 +113,7 @@ func (a *authService) StartOAuthCodeFlow(ctx context.Context, clientID, redirect
 		RedirectURI: redirectURI,
 		Scopes:      scopes,
 		State:       state,
+		Nonce:       nonce,
 	})
 
 	return nil
@@ -132,16 +135,16 @@ func (a *authService) OAuthConsent(ctx context.Context) (string, error) {
 	code := generateToken(64)
 	codeHash := hashTokenWeak(code)
 
-	_, err = a.oauthRepo.Create(ctx, req.ClientID, a.AuthenticatedUserID(ctx), repos.OAuthTokenCode, codeHash, req.RedirectURI, req.Scopes, 5*time.Minute)
+	_, err = a.oauthRepo.Create(ctx, req.ClientID, a.AuthenticatedUserID(ctx), repos.OAuthTokenCode, codeHash, req.RedirectURI, req.Scopes, []byte(req.Nonce), 1*time.Minute)
 	if err != nil {
 		return "", fmt.Errorf("OAuth consent: %w", err)
 	}
 	return code, nil
 }
 
-func (a *authService) OAuthGenerateTokens(ctx context.Context, clientID, clientSecret, redirectURI, grantType, grant string) (string, string, error) {
+func (a *authService) OAuthGenerateTokens(ctx context.Context, clientID, clientSecret, redirectURI, grantType, grant string) (string, string, string, error) {
 	if err := a.VerifyClientCredentials(ctx, clientID, clientSecret); err != nil {
-		return "", "", fmt.Errorf("oauth generate tokens: %w", err)
+		return "", "", "", fmt.Errorf("oauth generate tokens: %w", err)
 	}
 
 	var hash []byte
@@ -154,7 +157,7 @@ func (a *authService) OAuthGenerateTokens(ctx context.Context, clientID, clientS
 		hash = hashToken(grant)
 		tokenType = repos.OAuthTokenRefresh
 	default:
-		return "", "", ErrUnsupportedGrantType
+		return "", "", "", ErrUnsupportedGrantType
 	}
 
 	token, err := a.oauthRepo.Find(ctx, clientID, tokenType, hash)
@@ -162,23 +165,23 @@ func (a *authService) OAuthGenerateTokens(ctx context.Context, clientID, clientS
 		if errors.Is(err, repos.ErrNoRecord) {
 			err = ErrInvalidGrant
 		}
-		return "", "", fmt.Errorf("oauth generate tokens: %w", err)
+		return "", "", "", fmt.Errorf("oauth generate tokens: %w", err)
 	}
 	if token.Used {
 		err = a.RevokeOAuthTokens(ctx, clientID, token.UserID)
 		if err != nil {
 			log.Errorf("%s\n%s", fmt.Sprintf("oauth generate tokens: %s", err), debug.Stack())
 		}
-		return "", "", ErrReusedToken
+		return "", "", "", ErrReusedToken
 	}
 
 	if grantType != "refresh_token" && token.RedirectURI != redirectURI {
-		return "", "", fmt.Errorf("oauth generate tokens: %w", ErrInvalidRedirectURI)
+		return "", "", "", fmt.Errorf("oauth generate tokens: %w", ErrInvalidRedirectURI)
 	}
 
 	err = a.oauthRepo.Use(ctx, clientID, tokenType, token.TokenHash)
 	if err != nil {
-		return "", "", fmt.Errorf("oauth generate tokens: %w", err)
+		return "", "", "", fmt.Errorf("oauth generate tokens: %w", err)
 	}
 
 	access := generateToken(64)
@@ -186,17 +189,48 @@ func (a *authService) OAuthGenerateTokens(ctx context.Context, clientID, clientS
 	refresh := generateToken(128)
 	refreshHash := hashToken(refresh)
 
-	_, err = a.oauthRepo.Create(ctx, token.ClientID, token.UserID, repos.OAuthTokenAccess, accessHash, "", token.Scopes, 30*time.Minute)
+	_, err = a.oauthRepo.Create(ctx, token.ClientID, token.UserID, repos.OAuthTokenAccess, accessHash, "", token.Scopes, nil, 30*time.Minute)
 	if err != nil {
-		return "", "", fmt.Errorf("oauth tokens by code: %w", err)
+		return "", "", "", fmt.Errorf("oauth tokens by code: %w", err)
 	}
 
-	_, err = a.oauthRepo.Create(ctx, token.ClientID, token.UserID, repos.OAuthTokenRefresh, refreshHash, "", token.Scopes, 12*7*24*time.Hour)
+	_, err = a.oauthRepo.Create(ctx, token.ClientID, token.UserID, repos.OAuthTokenRefresh, refreshHash, "", token.Scopes, nil, 12*7*24*time.Hour)
 	if err != nil {
-		return "", "", fmt.Errorf("oauth tokens by code: %w", err)
+		return "", "", "", fmt.Errorf("oauth tokens by code: %w", err)
 	}
 
-	return access, refresh, nil
+	var nonce string
+	if grantType == "authorization_code" {
+		nonce = string(token.Data)
+	}
+
+	var id string
+	if slices.Contains(token.Scopes, "openid") {
+		id, err = a.createIDToken(token.ClientID, token.UserID, nonce)
+		if err != nil {
+			return "", "", "", fmt.Errorf("oauth tokens by code: %w", err)
+		}
+	}
+
+	return access, refresh, id, nil
+}
+
+func (a *authService) createIDToken(clientID, userID, nonce string) (string, error) {
+	type claims struct {
+		jwt.RegisteredClaims
+		Nonce string `json:"nonce,omitempty"`
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    "https://id.julianh.de",
+			Subject:   userID,
+			Audience:  jwt.ClaimStrings{clientID},
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * time.Minute)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+		Nonce: nonce,
+	})
+	return token.SignedString(config.JWTPrivateKey())
 }
 
 func (a *authService) VerifyClientCredentials(ctx context.Context, clientID, clientSecret string) error {

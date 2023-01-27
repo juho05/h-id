@@ -37,4 +37,5 @@ func (h *Handler) RegisterRoutes() {
 	h.Router.With(csrf).Route("/user", h.userRoutes)
 	h.Router.With(csrf).Route("/app", h.appRoutes)
 	h.Router.Route("/oauth", h.oauthRoutes)
+	h.Router.Route("/.well-known", h.wellKnownRoutes)
 }

@@ -21,12 +21,13 @@ type OAuthTokenModel struct {
 	ClientID    string             `db:"client_id"`
 	UserID      string             `db:"user_id"`
 	Scopes      StringSlice        `db:"scopes"`
+	Data        []byte             `db:"data"`
 	Expires     int64              `db:"expires"`
 	Used        bool               `db:"used"`
 }
 
 type OAuthRepository interface {
-	Create(ctx context.Context, clientID, userID string, category OAuthTokenCategory, tokenHash []byte, redirectURI string, scopes []string, lifetime time.Duration) (*OAuthTokenModel, error)
+	Create(ctx context.Context, clientID, userID string, category OAuthTokenCategory, tokenHash []byte, redirectURI string, scopes []string, data []byte, lifetime time.Duration) (*OAuthTokenModel, error)
 	Find(ctx context.Context, clientID string, category OAuthTokenCategory, tokenHash []byte) (*OAuthTokenModel, error)
 	Use(ctx context.Context, clientID string, category OAuthTokenCategory, tokenHash []byte) error
 	Delete(ctx context.Context, clientID string, category OAuthTokenCategory, tokenHash []byte) error
