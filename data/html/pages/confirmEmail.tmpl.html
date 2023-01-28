@@ -1,21 +1,27 @@
 {{define "title"}}Confirm Email{{end}}
 
 {{define "main"}}
-<form action="/user/confirmEmail" method="POST">
+<div class="form-panel">
+  <h2 class="form-title">Confirm Email</h2>
   {{with .Errors}}
-  <ul>
+  <ul class="error-list">
     {{range .}}
     <li>{{.}}</li>
     {{end}}
   </ul>
   {{end}}
 
-  <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+  <form class="form" action="/user/confirmEmail" method="POST">
+    <div>
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 
-  <label class="input-label" for="code">Code:</label>
-  <input class="{{if .FieldErrors.Code}}invalid-field{{end}}" id="code" type="text" name="code" autocomplete="off" required maxlength="6">
-  {{with .FieldErrors.Code}}<label class="error-label" for="code">{{.}}</label>{{end}}
-
-  <input class="btn btn-primary" type="submit" value="Verify">
-</form>
+      <label class="input-label" for="code">Code:</label>
+      <input class="{{if .FieldErrors.Code}}invalid-field{{end}}" id="code" type="text" name="code" autocomplete="off" required maxlength="6">
+      {{with .FieldErrors.Code}}<label class="error-label" for="code">{{.}}</label>{{end}}
+    </div>
+    <div class="submit-div">
+      <input class="btn" type="submit" value="Verify">
+    </div>
+  </form>
+</div>
 {{end}}

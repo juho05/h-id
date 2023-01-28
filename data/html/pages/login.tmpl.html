@@ -1,25 +1,30 @@
 {{define "title"}}Login{{end}}
 
 {{define "main"}}
-<form action="/user/login" method="POST">
+<div class="form-panel">
+  <h2 class="form-title">Login</h2>
   {{with .Errors}}
-  <ul>
+  <ul class="error-list">
     {{range .}}
     <li>{{.}}</li>
     {{end}}
   </ul>
   {{end}}
+  <form class="form" action="/user/login" method="POST">
+    <div>
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 
-  <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <label class="input-label" for="email">Email:</label>
+      <input class="{{if .FieldErrors.Email}}invalid-field{{end}}" id="email" type="email" name="email" {{with .Form}}value="{{.Email}}"{{end}} required>
+        {{with .FieldErrors.Email}}<label class="error-label" for="email">{{.}}</label>{{end}}
 
-  <label class="input-label" for="email">Email:</label>
-  <input class="{{if .FieldErrors.Email}}invalid-field{{end}}" id="email" type="email" name="email" {{with .Form}}value="{{.Email}}"{{end}} required>
-  {{with .FieldErrors.Email}}<label class="error-label" for="email">{{.}}</label>{{end}}
-
-  <label class="input-label" for="password">Password:</label>
-  <input class="{{if .FieldErrors.Password}}invalid-field{{end}}" id="password" type="password" name="password" required>
-  {{with .FieldErrors.Password}}<label class="error-label" for="password">{{.}}</label>{{end}}
-
-  <input class="btn btn-primary" type="submit" value="Login">
-</form>
+      <label class="input-label" for="password">Password:</label>
+      <input class="{{if .FieldErrors.Password}}invalid-field{{end}}" id="password" type="password" name="password" required>
+        {{with .FieldErrors.Password}}<label class="error-label" for="password">{{.}}</label>{{end}}
+    </div>
+    <div class="submit-div">
+      <input class="btn" type="submit" value="Login">
+    </div>
+  </form>
+</div>
 {{end}}

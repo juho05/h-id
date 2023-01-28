@@ -34,6 +34,7 @@ func (h *Handler) RegisterRoutes() {
 	}
 	h.registerMiddlewares()
 	h.Router.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(h.StaticFS))))
+	h.Router.Get("/", h.newPage("index"))
 	h.Router.With(csrf).Route("/user", h.userRoutes)
 	h.Router.With(csrf).Route("/app", h.appRoutes)
 	h.Router.Route("/oauth", h.oauthRoutes)

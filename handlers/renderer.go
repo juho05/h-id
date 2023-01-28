@@ -18,21 +18,21 @@ type templateData struct {
 	FieldErrors map[string]string
 	Errors      []string
 	CSRFToken   string
+	UserID      string
 }
 
 func (h *Handler) newTemplateData(r *http.Request) templateData {
 	return templateData{
 		FieldErrors: make(map[string]string),
 		CSRFToken:   nosurf.Token(r),
+		UserID:      h.AuthService.AuthenticatedUserID(r.Context()),
 	}
 }
 
 func (h *Handler) newTemplateDataWithData(r *http.Request, data any) templateData {
-	return templateData{
-		FieldErrors: make(map[string]string),
-		CSRFToken:   nosurf.Token(r),
-		Data:        data,
-	}
+	tmplData := h.newTemplateData(r)
+	tmplData.Data = data
+	return tmplData
 }
 
 type Renderer interface {

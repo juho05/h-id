@@ -1,33 +1,39 @@
 {{define "title"}}Sign up{{end}}
 
 {{define "main"}}
-<form action="/user/signup" method="POST">
+<div class="form-panel">
+  <h2 class="form-title">Sign up</h2>
   {{with .Errors}}
-  <ul>
+  <ul class="error-list">
     {{range .}}
     <li>{{.}}</li>
     {{end}}
   </ul>
   {{end}}
 
-  <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+  <form class="form" action="/user/signup" method="POST">
+    <div>
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 
-  <label for="name">Name:</label>
-  <input class="{{if .FieldErrors.Name}}invalid-field{{end}}" id="name" type="text" name="name" maxlength="32" {{with .Form}}value="{{.Name}}"{{end}} required>
-  {{with .FieldErrors.Name}}<label class="error-label" for="name">{{.}}</label>{{end}}
+      <label class="input-label" for="name">Name:</label>
+      <input class="{{if .FieldErrors.Name}}invalid-field{{end}}" id="name" type="text" name="name" maxlength="32" {{with .Form}}value="{{.Name}}"{{end}} required>
+        {{with .FieldErrors.Name}}<label class="error-label" for="name">{{.}}</label>{{end}}
 
-  <label class="input-label" for="email">Email:</label>
-  <input class="{{if .FieldErrors.Email}}invalid-field{{end}}" id="email" type="email" name="email" {{with .Form}}value="{{.Email}}"{{end}} required>
-  {{with .FieldErrors.Email}}<label class="error-label" for="email">{{.}}</label>{{end}}
+      <label class="input-label" for="email">Email:</label>
+      <input class="{{if .FieldErrors.Email}}invalid-field{{end}}" id="email" type="email" name="email" {{with .Form}}value="{{.Email}}"{{end}} required>
+        {{with .FieldErrors.Email}}<label class="error-label" for="email">{{.}}</label>{{end}}
 
-  <label class="input-label" for="password">Password:</label>
-  <input class="{{if .FieldErrors.Password}}invalid-field{{end}}" id="password" type="password" name="password" required>
-  {{with .FieldErrors.Password}}<label class="error-label" for="password">{{.}}</label>{{end}}
+      <label class="input-label" for="password">Password:</label>
+      <input class="{{if .FieldErrors.Password}}invalid-field{{end}}" id="password" type="password" name="password" required>
+        {{with .FieldErrors.Password}}<label class="error-label" for="password">{{.}}</label>{{end}}
 
-  <label class="input-label" for="repeatPassword">Repeat password:</label>
-  <input class="{{if .FieldErrors.RepeatPassword}}invalid-field{{end}}" id="repeatPassword" type="password" name="repeatPassword" required>
-  {{with .FieldErrors.RepeatPassword}}<label class="error-label" for="repeatPassword">{{.}}</label>{{end}}
-
-  <input class="btn btn-primary" type="submit" value="Login">
-</form>
+      <label class="input-label" for="repeatPassword">Repeat password:</label>
+      <input class="{{if .FieldErrors.RepeatPassword}}invalid-field{{end}}" id="repeatPassword" type="password" name="repeatPassword" required>
+        {{with .FieldErrors.RepeatPassword}}<label class="error-label" for="repeatPassword">{{.}}</label>{{end}}
+    </div>
+    <div class="submit-div">
+      <input class="btn" type="submit" value="Sign up">
+    </div>
+  </form>
+</div>
 {{end}}

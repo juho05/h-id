@@ -1,13 +1,8 @@
 {{define "title"}}OAuth Consent{{end}}
 
 {{define "main"}}
-<h3><b><a href="{{.Data.ClientWebsite}}">{{.Data.ClientName}}</a></b> requests permission to:</h3>
-<ul>
-  {{range .Data.Scopes}}
-  <li>{{.}}</li>
-  {{end}}
-</ul>
-<form action="/oauth/consent" method="POST">
+<div class="form-panel">
+  <h2 class="form-title">Login with H-ID</h2>
   {{with .Errors}}
   <ul>
     {{range .}}
@@ -16,8 +11,20 @@
   </ul>
   {{end}}
 
-  <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
-  <button class="btn btn-secondary" type="submit" name="choice" value="deny">Deny</button>
-  <button class="btn btn-primary" type="submit" name="choice" value="accept">Accept</button>
-</form>
+  <form class="form" action="/oauth/consent" method="POST">
+    <div>
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <h3 class="consent-h3"><b><a href="{{.Data.ClientWebsite}}" target="_blank">{{.Data.ClientName}}</a></b> requests permission to:</h3>
+      <ul>
+        {{range .Data.Scopes}}
+        <li>{{.}}</li>
+        {{end}}
+      </ul>
+    </div>
+    <div class="submit-div">
+      <button class="btn btn-red" type="submit" name="choice" value="deny">Deny</button>
+      <button class="btn btn-green" type="submit" name="choice" value="accept">Accept</button>
+    </div>
+  </form>
+</div>
 {{end}}

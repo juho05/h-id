@@ -9,6 +9,18 @@
   </head>
   <body>
     <header> 
+      <div>
+          <a href="/" id="nav-brand">H-ID</a>
+      </div>
+      <nav>
+        {{if not .UserID}}
+        <a class="nav-link" href="/user/login">Login</a>
+        <a class="nav-link" href="/user/signup">Sign up</a>
+        {{else}}
+        <a class="nav-link" href="/app/list">Apps</a>
+        <a class="nav-link" href="/user/profile">Account</a>
+        {{end}}
+      </nav>
     </header>
     <main>
       {{template "main" .}}
