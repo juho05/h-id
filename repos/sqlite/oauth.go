@@ -42,9 +42,9 @@ func (a *oauthRepository) Create(ctx context.Context, clientID, userID string, c
 	return token, nil
 }
 
-func (a *oauthRepository) Find(ctx context.Context, clientID string, category repos.OAuthTokenCategory, tokenHash []byte) (*repos.OAuthTokenModel, error) {
+func (a *oauthRepository) Find(ctx context.Context, category repos.OAuthTokenCategory, tokenHash []byte) (*repos.OAuthTokenModel, error) {
 	var token repos.OAuthTokenModel
-	err := a.db.GetContext(ctx, &token, "SELECT * FROM oauth WHERE client_id = ? AND category = ? AND token_hash = ? AND expires > ?", clientID, category, tokenHash, time.Now().Unix())
+	err := a.db.GetContext(ctx, &token, "SELECT * FROM oauth WHERE category = ? AND token_hash = ? AND expires > ?", category, tokenHash, time.Now().Unix())
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			err = repos.ErrNoRecord

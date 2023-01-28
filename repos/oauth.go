@@ -28,7 +28,7 @@ type OAuthTokenModel struct {
 
 type OAuthRepository interface {
 	Create(ctx context.Context, clientID, userID string, category OAuthTokenCategory, tokenHash []byte, redirectURI string, scopes []string, data []byte, lifetime time.Duration) (*OAuthTokenModel, error)
-	Find(ctx context.Context, clientID string, category OAuthTokenCategory, tokenHash []byte) (*OAuthTokenModel, error)
+	Find(ctx context.Context, category OAuthTokenCategory, tokenHash []byte) (*OAuthTokenModel, error)
 	Use(ctx context.Context, clientID string, category OAuthTokenCategory, tokenHash []byte) error
 	Delete(ctx context.Context, clientID string, category OAuthTokenCategory, tokenHash []byte) error
 	DeleteByUser(ctx context.Context, clientID, userID string) error

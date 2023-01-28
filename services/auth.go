@@ -34,6 +34,7 @@ type AuthService interface {
 	VerifyPassword(user *repos.UserModel, password string) error
 	VerifyPasswordByID(ctx context.Context, id, password string) error
 	AuthenticatedUserID(ctx context.Context) string
+	AuthorizedScopes(ctx context.Context) []string
 	IsEmailConfirmed(ctx context.Context, id string) (bool, error)
 	SendConfirmEmail(ctx context.Context, user *repos.UserModel) error
 	ConfirmEmail(ctx context.Context, userID, code string) error
@@ -45,8 +46,15 @@ type AuthService interface {
 	VerifyClientCredentials(ctx context.Context, clientID, clientSecret string) error
 	RevokeOAuthTokens(ctx context.Context, clientID, userID string) error
 
+	VerifyAccessToken(ctx context.Context, token string, requiredScopes []string) (userID string, scopes []string, err error)
+
 	DescribeScopes(scopes []string) []string
 }
+
+type (
+	AuthUserIDCtxKey struct{}
+	AuthScopesCtxKey struct{}
+)
 
 func init() {
 	buf := make([]byte, 1)
@@ -160,12 +168,15 @@ func (a *authService) OAuthGenerateTokens(ctx context.Context, clientID, clientS
 		return "", "", "", ErrUnsupportedGrantType
 	}
 
-	token, err := a.oauthRepo.Find(ctx, clientID, tokenType, hash)
+	token, err := a.oauthRepo.Find(ctx, tokenType, hash)
 	if err != nil {
 		if errors.Is(err, repos.ErrNoRecord) {
 			err = ErrInvalidGrant
 		}
 		return "", "", "", fmt.Errorf("oauth generate tokens: %w", err)
+	}
+	if token.ClientID != clientID {
+		return "", "", "", fmt.Errorf("oauth generate tokens: %w", ErrInvalidGrant)
 	}
 	if token.Used {
 		err = a.RevokeOAuthTokens(ctx, clientID, token.UserID)
@@ -323,7 +334,13 @@ func (a *authService) ConfirmEmail(ctx context.Context, userID, code string) err
 }
 
 func (a *authService) AuthenticatedUserID(ctx context.Context) string {
-	return a.sessionManager.GetString(ctx, "authUserID")
+	value, _ := ctx.Value(AuthUserIDCtxKey{}).(string)
+	return value
+}
+
+func (a *authService) AuthorizedScopes(ctx context.Context) []string {
+	value, _ := ctx.Value(AuthScopesCtxKey{}).([]string)
+	return value
 }
 
 func (a *authService) IsEmailConfirmed(ctx context.Context, id string) (bool, error) {
@@ -386,6 +403,19 @@ func (a *authService) VerifyPasswordByID(ctx context.Context, id, password strin
 		return ErrInvalidCredentials
 	}
 	return err
+}
+
+func (a *authService) VerifyAccessToken(ctx context.Context, token string, requiredScopes []string) (string, []string, error) {
+	access, err := a.oauthRepo.Find(ctx, repos.OAuthTokenAccess, hashTokenWeak(token))
+	if err != nil {
+		return "", nil, fmt.Errorf("verify access token: %w", ErrInvalidCredentials)
+	}
+	for _, s := range requiredScopes {
+		if !slices.Contains(access.Scopes, s) {
+			return "", nil, ErrInsufficientScope
+		}
+	}
+	return access.UserID, access.Scopes, nil
 }
 
 func generateCode(length int) string {

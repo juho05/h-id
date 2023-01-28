@@ -1,15 +1,19 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/Bananenpro/log"
 	"github.com/justinas/nosurf"
+
+	"github.com/Bananenpro/h-id/services"
 )
 
 type statusResponseWriter struct {
@@ -82,7 +86,7 @@ func csrf(next http.Handler) http.Handler {
 
 func (h *Handler) auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		userID := h.AuthService.AuthenticatedUserID(r.Context())
+		userID := h.SessionManager.GetString(r.Context(), "authUserID")
 		if userID == "" {
 			http.Redirect(w, r, fmt.Sprintf("/user/login?redirect=%s", url.QueryEscape(r.URL.RequestURI())), http.StatusSeeOther)
 			return
@@ -100,6 +104,35 @@ func (h *Handler) auth(next http.Handler) http.Handler {
 			return
 		}
 
+		r = r.WithContext(context.WithValue(r.Context(), services.AuthUserIDCtxKey{}, userID))
+
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (h *Handler) oauth(requiredScopes ...string) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			userID, scopes, err := h.AuthService.VerifyAccessToken(r.Context(), strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "), requiredScopes)
+			if err != nil {
+				if errors.Is(err, services.ErrInvalidCredentials) {
+					if r.Header.Get("Authorization") == "" {
+						w.Header().Set("WWW-Authenticate", fmt.Sprintf("Bearer scope=\"%s\" error=\"%s\"", strings.Join(requiredScopes, " "), "missing_token"))
+					} else {
+						w.Header().Set("WWW-Authenticate", fmt.Sprintf("Bearer scope=\"%s\" error=\"%s\"", strings.Join(requiredScopes, " "), "invalid_token"))
+					}
+					clientError(w, http.StatusUnauthorized)
+				} else if errors.Is(err, services.ErrInsufficientScope) {
+					w.Header().Set("WWW-Authenticate", fmt.Sprintf("Bearer scope=\"%s\" error=\"%s\"", strings.Join(requiredScopes, " "), "insufficient_scope"))
+					clientError(w, http.StatusForbidden)
+				} else {
+					serverError(w, err)
+				}
+				return
+			}
+			r = r.WithContext(context.WithValue(r.Context(), services.AuthUserIDCtxKey{}, userID))
+			r = r.WithContext(context.WithValue(r.Context(), services.AuthScopesCtxKey{}, scopes))
+			next.ServeHTTP(w, r)
+		})
+	}
 }

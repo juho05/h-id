@@ -22,6 +22,8 @@ func (h *Handler) userRoutes(r chi.Router) {
 	r.Get("/confirmEmail", h.userConfirmEmailPage)
 	r.Post("/confirmEmail", h.userConfirmEmail)
 
+	r.With(h.oauth()).HandleFunc("/info", h.userInfo)
+
 	r.With(h.auth).Get("/profile", h.userProfile)
 }
 
@@ -181,7 +183,41 @@ func (h *Handler) userConfirmEmail(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
 }
 
+// GET/POST /user/info
+func (h *Handler) userInfo(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		clientError(w, http.StatusMethodNotAllowed)
+		return
+	}
+	type response struct {
+		Subject       string `json:"sub"`
+		Name          string `json:"name,omitempty"`
+		Email         string `json:"email,omitempty"`
+		EmailVerified bool   `json:"email_verified,omitempty"`
+	}
+
+	user, err := h.UserService.Find(r.Context(), h.AuthService.AuthenticatedUserID(r.Context()))
+	if err != nil {
+		serverError(w, fmt.Errorf("userinfo endpoint: %w", err))
+		return
+	}
+
+	resp := response{
+		Subject: user.ID,
+	}
+	for _, scope := range h.AuthService.AuthorizedScopes(r.Context()) {
+		switch scope {
+		case "profile":
+			resp.Name = user.Name
+		case "email":
+			resp.Email = user.Email
+			resp.EmailVerified = user.EmailConfirmed
+		}
+	}
+	respondJSON(w, http.StatusOK, resp)
+}
+
 // GET /user/profile
 func (h *Handler) userProfile(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte(h.SessionManager.GetString(r.Context(), "authUserID")))
+	w.Write([]byte(h.AuthService.AuthenticatedUserID(r.Context())))
 }

@@ -3,7 +3,7 @@ package services
 import "errors"
 
 var (
-	ErrInvalidCredentials         = errors.New("invalid credentials")
+	ErrInvalidCredentials         = errors.New("invalid-credentials")
 	ErrTimeout                    = errors.New("timeout")
 	ErrInvalidRedirectURI         = errors.New("invalid-redirect-uri")
 	ErrUnsupportedResponseType    = errors.New("unsupported-response-type")
@@ -12,4 +12,6 @@ var (
 	ErrReusedToken                = errors.New("reused-token")
 	ErrInvalidGrant               = errors.New("invalid-grant")
 	ErrUnsupportedGrantType       = errors.New("unsupported-grant-type")
+
+	ErrInsufficientScope = errors.New("insufficient-scope")
 )
