@@ -12,6 +12,8 @@ type DB interface {
 	NewTokenRepository() TokenRepository
 	NewClientRepository() ClientRepository
 	NewOAuthRepository() OAuthRepository
+
+	Close() error
 }
 
 type Transaction interface {

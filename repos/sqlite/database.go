@@ -25,6 +25,10 @@ func Connect(connectionString string) (repos.DB, error) {
 	}, nil
 }
 
+func (d *DB) Close() error {
+	return d.db.Close()
+}
+
 func newBase() repos.BaseModel {
 	return repos.BaseModel{
 		ID:        ulid.Make().String(),

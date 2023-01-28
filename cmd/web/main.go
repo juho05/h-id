@@ -25,6 +25,8 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("Failed to connect to database:", err)
 	}
+	defer db.Close()
+
 	userRepo := db.NewUserRepository()
 	tokenRepo := db.NewTokenRepository()
 	clientRepo := db.NewClientRepository()
