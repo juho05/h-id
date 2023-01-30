@@ -9,19 +9,37 @@ H-ID is an identity service for H-* applications.
 ### Prerequisites
 
 - [Go](https://go.dev/) 1.19+
-- [sql-migrate](https://github.com/rubenv/sql-migrate)
+- [GNU Make](https://www.gnu.org/software/make)
 - gcc
 
 ### Apply database migrations
 
 ```sh
-sql-migrate up
+make migrate-up
 ```
 
 ### Run the webserver
 
 ```sh
-go run ./cmd/web
+make run
+```
+
+### Run the webserver with live reload
+
+```sh
+make watch
+```
+
+### Build
+
+```sh
+make
+```
+
+### Clean
+
+```sh
+make clean
 ```
 
 ## License
