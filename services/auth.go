@@ -308,18 +308,7 @@ func (a *authService) ConfirmEmail(ctx context.Context, userID, code string) err
 		return fmt.Errorf("confirm email: %w", err)
 	}
 
-	tx, err := a.userRepo.BeginTransaction(ctx)
-	if err != nil {
-		return fmt.Errorf("confirm email: %w", err)
-	}
-	defer tx.Rollback()
-
-	err = tx.UpdateEmailConfirmed(userID, true)
-	if err != nil {
-		return fmt.Errorf("confirm email: %w", err)
-	}
-
-	err = tx.Commit()
+	err = a.userRepo.UpdateEmailConfirmed(ctx, userID, true)
 	if err != nil {
 		return fmt.Errorf("confirm email: %w", err)
 	}

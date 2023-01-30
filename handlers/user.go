@@ -3,10 +3,14 @@ package handlers
 import (
 	"errors"
 	"fmt"
+	"io"
+	"mime"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
+	"github.com/disintegration/imaging"
 	"github.com/go-chi/chi/v5"
 
 	"github.com/Bananenpro/h-id/repos"
@@ -22,9 +26,12 @@ func (h *Handler) userRoutes(r chi.Router) {
 	r.Get("/confirmEmail", h.userConfirmEmailPage)
 	r.Post("/confirmEmail", h.userConfirmEmail)
 
+	r.Get("/{id}/picture", h.profilePicture)
+
 	r.With(h.oauth()).HandleFunc("/info", h.userInfo)
 
 	r.With(h.auth).Get("/profile", h.userProfile)
+	r.With(h.auth).Post("/profile", h.updateUserProfile)
 }
 
 // POST /user/signup
@@ -194,6 +201,7 @@ func (h *Handler) userInfo(w http.ResponseWriter, r *http.Request) {
 		Name          string `json:"name,omitempty"`
 		Email         string `json:"email,omitempty"`
 		EmailVerified bool   `json:"email_verified,omitempty"`
+		Picture       string `json:"picture"`
 	}
 
 	user, err := h.UserService.Find(r.Context(), h.AuthService.AuthenticatedUserID(r.Context()))
@@ -204,6 +212,7 @@ func (h *Handler) userInfo(w http.ResponseWriter, r *http.Request) {
 
 	resp := response{
 		Subject: user.ID,
+		Picture: "https://id.julianh.de/user/" + user.ID + "/picture",
 	}
 	for _, scope := range h.AuthService.AuthorizedScopes(r.Context()) {
 		switch scope {
@@ -219,5 +228,105 @@ func (h *Handler) userInfo(w http.ResponseWriter, r *http.Request) {
 
 // GET /user/profile
 func (h *Handler) userProfile(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte(h.AuthService.AuthenticatedUserID(r.Context())))
+	user, err := h.UserService.Find(r.Context(), h.AuthService.AuthenticatedUserID(r.Context()))
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	type userDTO struct {
+		ID    string
+		Name  string
+		Email string
+	}
+	h.Renderer.render(w, http.StatusOK, "profile", h.newTemplateDataWithData(r, userDTO{
+		ID:    user.ID,
+		Name:  user.Name,
+		Email: user.Email,
+	}))
+}
+
+// POST /user/profile
+func (h *Handler) updateUserProfile(w http.ResponseWriter, r *http.Request) {
+	user, err := h.UserService.Find(r.Context(), h.AuthService.AuthenticatedUserID(r.Context()))
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+
+	type request struct {
+		Name string `form:"name" validate:"required,notblank,min=3,max=32"`
+	}
+	type userDTO struct {
+		ID    string
+		Name  string
+		Email string
+	}
+	tmplData := h.newTemplateDataWithData(r, userDTO{
+		ID:    user.ID,
+		Name:  user.Name,
+		Email: user.Email,
+	})
+	body, ok := decodeAndValidateBody[request](h, w, r, "profile", &tmplData)
+	if !ok {
+		return
+	}
+
+	err = h.UserService.Update(r.Context(), h.AuthService.AuthenticatedUserID(r.Context()), body.Name)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+
+	if pictureFile, pictureHeader, err := r.FormFile("profile_picture"); err == nil {
+		if pictureHeader.Size > 10<<20 { // 10 MB
+			tmplData.FieldErrors["ProfilePicture"] = "Profile picture size must not exceed 10 MB"
+			h.Renderer.render(w, http.StatusUnprocessableEntity, "profile", tmplData)
+			return
+		}
+
+		mimeType, _, err := mime.ParseMediaType(pictureHeader.Header.Get("Content-Type"))
+		if err != nil || (mimeType != "image/jpeg" && mimeType != "image/png" && mimeType != "image/gif") {
+			tmplData.FieldErrors["ProfilePicture"] = "Profile picture must be in JPEG, PNG or GIF format"
+			h.Renderer.render(w, http.StatusUnprocessableEntity, "profile", tmplData)
+			return
+		}
+
+		img, err := imaging.Decode(io.LimitReader(pictureFile, 10<<20), imaging.AutoOrientation(true))
+		if err != nil {
+			clientError(w, http.StatusBadRequest)
+			return
+		}
+
+		err = h.UserService.SetProfilePicture(user.ID, img)
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+	}
+
+	http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+}
+
+func (h *Handler) profilePicture(w http.ResponseWriter, r *http.Request) {
+	size := 512
+	if s, err := strconv.Atoi(r.URL.Query().Get("size")); err == nil {
+		size = s
+	}
+	if size > 512 {
+		size = 512
+	}
+
+	userID := chi.URLParam(r, "id")
+
+	etag := h.UserService.ProfilePictureETag(userID, size)
+	if matchETagHeader(etag, r.Header.Get("If-None-Match"), true) {
+		clientError(w, http.StatusNotModified)
+		return
+	}
+
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("ETag", fmt.Sprintf("W/\"%s\"", etag))
+	w.WriteHeader(http.StatusOK)
+	h.UserService.LoadProfilePicture(userID, size, w)
 }

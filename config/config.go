@@ -242,3 +242,24 @@ func JWTPrivateKeyPassword() (password string) {
 	}()
 	return os.Getenv("JWT_PRIVATE_KEY_PASSWORD")
 }
+
+func ProfilePictureDir() (dir string) {
+	if d, ok := values["PROFILE_PICTURE_DIR"]; ok {
+		return d.(string)
+	}
+	defer func() {
+		values["PROFILE_PICTURE_DIR"] = dir
+	}()
+	def := "./profile_pictures"
+	dir = os.Getenv("PROFILE_PICTURE_DIR")
+	if dir == "" {
+		dir = def
+	}
+
+	err := os.MkdirAll(dir, 0o755)
+	if err != nil {
+		log.Errorf("Couldn't create profile picture directory (%s): %s", dir, err)
+	}
+
+	return dir
+}

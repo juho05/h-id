@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"mime"
 	"net/http"
 	"reflect"
 	"runtime/debug"
@@ -104,7 +105,13 @@ func decodeAndValidateBody[T any](handler *Handler, w http.ResponseWriter, r *ht
 func decodeBody[T any](r *http.Request) (T, error) {
 	var obj T
 
-	err := r.ParseForm()
+	var err error
+	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err == nil && mediaType == "multipart/form-data" {
+		err = r.ParseMultipartForm(32 << 20) // 32 MB buffer
+	} else {
+		err = r.ParseForm()
+	}
 	if err != nil {
 		return obj, fmt.Errorf("decode form body: %w", err)
 	}
@@ -195,4 +202,22 @@ func (h *Handler) authUser(w http.ResponseWriter, r *http.Request) (user *repos.
 func noCache(w http.ResponseWriter) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Pragma", "no-cache")
+}
+
+func matchETagHeader(current, header string, weak bool) bool {
+	for _, e := range strings.Split(header, ",") {
+		e = strings.TrimSpace(header)
+		if e == "" {
+			continue
+		}
+		if !strings.HasPrefix(header, "W/") && weak {
+			continue
+		}
+		e = strings.TrimPrefix(e, "W/")
+		e = strings.Trim(e, "\"")
+		if e == current || e == "*" {
+			return true
+		}
+	}
+	return false
 }

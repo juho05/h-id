@@ -1,0 +1,35 @@
+{{define "title"}}Profile{{end}}
+
+{{define "main"}}
+<div class="form-panel">
+  <h2 class="form-title">Profile</h2>
+  {{with .Errors}}
+  <ul class="error-list">
+    {{range .}}
+    <li>{{.}}</li>
+    {{end}}
+  </ul>
+  {{end}}
+
+  <form class="form" action="/user/profile" method="post" enctype="multipart/form-data">
+    <div>
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+      <label class="input-label">ID: {{.Data.ID}}</label>
+      <label class="input-label">Email: {{.Data.Email}}</label>
+
+      <label class="input-label" for="name">Name:</label>
+      <input class="{{if .FieldErrors.Name}}invalid-field{{end}}" id="name" type="text" name="name" maxlength="32" value="{{if .Form}}{{.Form.Name}}{{else}}{{.Data.Name}}{{end}}" required>
+      {{with .FieldErrors.Name}}<label class="error-label" for="name">{{.}}</label>{{end}}
+
+      <label class="input-label" for="profilePicture">Profile picture:</label>
+      <img src="/user/{{.Data.ID}}/picture?size=128"><br>
+      <input type="file" name="profile_picture" id="profilePicture">
+      {{with .FieldErrors.ProfilePicture}}<label class="error-label" for="profilePicture">{{.}}</label>{{end}}
+    </div>
+    <div class="submit-div">
+      <input class="btn" type="submit" value="Update">
+    </div>
+  </form>
+</div>
+{{end}}

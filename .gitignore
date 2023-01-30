@@ -1,4 +1,5 @@
 .env
 database.sqlite
-data/tls/
-data/rsa/
+/data/tls/
+/data/rsa/
+/profile_pictures/

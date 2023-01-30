@@ -13,16 +13,11 @@ type UserModel struct {
 }
 
 type UserRepository interface {
-	BeginTransaction(ctx context.Context) (UserTransaction, error)
 	Find(ctx context.Context, id string) (*UserModel, error)
 	FindByEmail(ctx context.Context, email string) (*UserModel, error)
 	GetPasswordHash(ctx context.Context, userID string) ([]byte, error)
-}
-
-type UserTransaction interface {
-	Transaction
-
-	Create(name, email string, passwordHash []byte) (*UserModel, error)
-	UpdateEmailConfirmed(id string, confirmed bool) error
-	Delete(id string) error
+	Create(ctx context.Context, name, email string, passwordHash []byte) (*UserModel, error)
+	Update(ctx context.Context, id, name string) error
+	UpdateEmailConfirmed(ctx context.Context, id string, confirmed bool) error
+	Delete(ctx context.Context, id string) error
 }

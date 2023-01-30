@@ -26,6 +26,9 @@ var (
 //go:embed data/openid_configuration.json
 var OpenIDConfiguration []byte
 
+//go:embed data/default_profile_picture.jpg
+var DefaultProfilePicture []byte
+
 func init() {
 	var err error
 	HTMLFS, err = fs.Sub(htmlFS, "data/html")
