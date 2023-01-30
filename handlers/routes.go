@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -23,9 +22,6 @@ func (h *Handler) registerMiddlewares() {
 		MaxAge:           int((15 * time.Minute).Seconds()),
 	}))
 	h.Router.Use(h.SessionManager.LoadAndSave)
-	h.SessionManager.ErrorFunc = func(w http.ResponseWriter, _ *http.Request, err error) {
-		serverError(w, fmt.Errorf("session load/save: %w", err))
-	}
 }
 
 func (h *Handler) RegisterRoutes() {

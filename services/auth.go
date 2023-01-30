@@ -324,6 +324,9 @@ func (a *authService) ConfirmEmail(ctx context.Context, userID, code string) err
 
 func (a *authService) AuthenticatedUserID(ctx context.Context) string {
 	value, _ := ctx.Value(AuthUserIDCtxKey{}).(string)
+	if value == "" {
+		value = a.sessionManager.GetString(ctx, "authUserID")
+	}
 	return value
 }
 
