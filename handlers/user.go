@@ -18,7 +18,7 @@ import (
 )
 
 func (h *Handler) userRoutes(r chi.Router) {
-	r.Get("/signup", h.newPage("signup"))
+	r.Get("/signup", h.userSignUpPage)
 	r.Post("/signup", h.userSignUp)
 	r.Get("/login", h.userLoginPage)
 	r.Post("/login", h.userLogin)
@@ -32,6 +32,17 @@ func (h *Handler) userRoutes(r chi.Router) {
 
 	r.With(h.auth).Get("/profile", h.userProfile)
 	r.With(h.auth).Post("/profile", h.updateUserProfile)
+}
+
+func (h *Handler) userSignUpPage(w http.ResponseWriter, r *http.Request) {
+	type tmplData struct {
+		LoginRedirect string
+	}
+	data := tmplData{}
+	if redirect := h.SessionManager.GetString(r.Context(), "loginRedirect"); redirect != "" {
+		data.LoginRedirect = url.QueryEscape(redirect)
+	}
+	h.Renderer.render(w, http.StatusSeeOther, "signup", h.newTemplateDataWithData(r, data))
 }
 
 // POST /user/signup
@@ -50,7 +61,13 @@ func (h *Handler) userSignUp(w http.ResponseWriter, r *http.Request) {
 	user, err := h.UserService.Create(r.Context(), body.Name, body.Email, body.Password)
 	if err != nil {
 		if errors.Is(err, repos.ErrDuplicateEmail) {
-			data := h.newTemplateData(r)
+
+			type tmplData struct {
+				LoginRedirect string
+			}
+			data := h.newTemplateDataWithData(r, tmplData{
+				LoginRedirect: url.QueryEscape(h.SessionManager.GetString(r.Context(), "loginRedirect")),
+			})
 			data.Errors = []string{"The user already exists."}
 			data.Form = body
 			h.Renderer.render(w, http.StatusUnprocessableEntity, "signup", data)
@@ -62,11 +79,11 @@ func (h *Handler) userSignUp(w http.ResponseWriter, r *http.Request) {
 
 	h.SessionManager.Put(r.Context(), "email", user.Email)
 
-	if user.EmailConfirmed {
-		http.Redirect(w, r, "/user/login", http.StatusSeeOther)
-	} else {
-		http.Redirect(w, r, "/user/confirmEmail", http.StatusSeeOther)
+	redirectQuery := ""
+	if redirect := h.SessionManager.PopString(r.Context(), "loginRedirect"); redirect != "" {
+		redirectQuery = "?redirect=" + url.QueryEscape(redirect)
 	}
+	http.Redirect(w, r, "/user/login"+redirectQuery, http.StatusSeeOther)
 }
 
 func (h *Handler) userLoginPage(w http.ResponseWriter, r *http.Request) {
@@ -82,7 +99,14 @@ func (h *Handler) userLoginPage(w http.ResponseWriter, r *http.Request) {
 	} else {
 		h.SessionManager.Remove(r.Context(), "loginRedirect")
 	}
-	h.Renderer.render(w, http.StatusOK, "login", h.newTemplateData(r))
+	data := h.newTemplateData(r)
+	type form struct {
+		Email string
+	}
+	data.Form = form{
+		Email: h.SessionManager.PopString(r.Context(), "email"),
+	}
+	h.Renderer.render(w, http.StatusOK, "login", data)
 }
 
 // POST /user/login
