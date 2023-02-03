@@ -4,9 +4,12 @@ import (
 	"embed"
 	"encoding/json"
 	"io/fs"
+	"time"
 
 	"github.com/Bananenpro/log"
 )
+
+var StartTime = time.Now()
 
 //go:embed data/html
 var htmlFS embed.FS

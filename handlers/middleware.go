@@ -13,6 +13,8 @@ import (
 	"github.com/Bananenpro/log"
 	"github.com/justinas/nosurf"
 
+	hid "github.com/Bananenpro/h-id"
+
 	"github.com/Bananenpro/h-id/services"
 )
 
@@ -132,6 +134,20 @@ func (h *Handler) oauth(requiredScopes ...string) func(next http.Handler) http.H
 			}
 			r = r.WithContext(context.WithValue(r.Context(), services.AuthUserIDCtxKey{}, userID))
 			r = r.WithContext(context.WithValue(r.Context(), services.AuthScopesCtxKey{}, scopes))
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func staticCache(maxAge time.Duration) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cache-Control", fmt.Sprintf("max-age=%d", int64(maxAge.Seconds())))
+			w.Header().Set("Last-Modified", hid.StartTime.Format(http.TimeFormat))
+			if ifModSince, err := time.Parse(http.TimeFormat, r.Header.Get("If-Modified-Since")); err == nil && ifModSince.After(hid.StartTime) {
+				w.WriteHeader(http.StatusNotModified)
+				return
+			}
 			next.ServeHTTP(w, r)
 		})
 	}

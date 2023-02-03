@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"io/fs"
 	"net/http"
 	"time"
 
+	"github.com/Bananenpro/log"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -21,7 +23,6 @@ func (h *Handler) registerMiddlewares() {
 		AllowCredentials: true,
 		MaxAge:           int((15 * time.Minute).Seconds()),
 	}))
-	h.Router.Use(h.SessionManager.LoadAndSave)
 }
 
 func (h *Handler) RegisterRoutes() {
@@ -29,10 +30,28 @@ func (h *Handler) RegisterRoutes() {
 		h.Router = chi.NewRouter()
 	}
 	h.registerMiddlewares()
-	h.Router.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(h.StaticFS))))
-	h.Router.Get("/", h.newPage("index"))
-	h.Router.With(csrf).Route("/user", h.userRoutes)
-	h.Router.With(csrf).Route("/app", h.appRoutes)
-	h.Router.Route("/oauth", h.oauthRoutes)
+
+	h.registerStaticRouts()
 	h.Router.Route("/.well-known", h.wellKnownRoutes)
+
+	h.Router.With(h.SessionManager.LoadAndSave).Get("/", h.newPage("index"))
+	h.Router.With(h.SessionManager.LoadAndSave).With(csrf).Route("/user", h.userRoutes)
+	h.Router.With(h.SessionManager.LoadAndSave).With(csrf).Route("/app", h.appRoutes)
+	h.Router.With(h.SessionManager.LoadAndSave).Route("/oauth", h.oauthRoutes)
+}
+
+func (h *Handler) registerStaticRouts() {
+	fonts, err := fs.Sub(h.StaticFS, "fonts")
+	if err != nil {
+		log.Fatalf("Failed to register fonts directory: %s", err)
+	}
+	h.Router.With(staticCache(8*7*24*time.Hour)).Handle("/static/fonts/*", http.StripPrefix("/static/fonts/", http.FileServer(http.FS(fonts))))
+
+	img, err := fs.Sub(h.StaticFS, "img")
+	if err != nil {
+		log.Fatalf("Failed to register img directory: %s", err)
+	}
+	h.Router.With(staticCache(7*24*time.Hour)).Handle("/static/img/*", http.StripPrefix("/static/img/", http.FileServer(http.FS(img))))
+
+	h.Router.With(staticCache(24*time.Hour)).Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(h.StaticFS))))
 }
