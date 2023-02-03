@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Bananenpro/log"
+	"github.com/go-chi/cors"
 	"github.com/justinas/nosurf"
 
 	hid "github.com/Bananenpro/h-id"
@@ -151,4 +152,31 @@ func staticCache(maxAge time.Duration) func(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Security-Policy", "default-src 'self';style-src 'self';frame-src 'self';script-src 'self'; connect-src 'self';")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Permissions-Policy", "geolocation=(), camera=(), microphone=()")
+		w.Header().Set("Referrer-Policy", "same-origin")
+		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
+		w.Header().Set("Cross-Origin-Embedder-Policy", "require-corp")
+		w.Header().Set("Cross-Origin-Resource-Policy", "same-site")
+		w.Header().Set("Permissions-Policy", "interest-cohort=()")
+		w.Header().Set("Form-Action", "'self'")
+		w.Header().Set("Base-Uri", "'none'")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func corsHeaders(next http.Handler) http.Handler {
+	handler := cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"https://*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowCredentials: true,
+		MaxAge:           int((15 * time.Minute).Seconds()),
+	})
+	return handler(next)
 }

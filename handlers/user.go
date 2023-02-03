@@ -26,9 +26,8 @@ func (h *Handler) userRoutes(r chi.Router) {
 	r.Get("/confirmEmail", h.userConfirmEmailPage)
 	r.Post("/confirmEmail", h.userConfirmEmail)
 
-	r.Get("/{id}/picture", h.profilePicture)
-
-	r.With(h.oauth()).HandleFunc("/info", h.userInfo)
+	r.With(corsHeaders).Get("/{id}/picture", h.profilePicture)
+	r.With(corsHeaders, h.oauth()).HandleFunc("/info", h.userInfo)
 
 	r.With(h.auth).Get("/profile", h.userProfile)
 	r.With(h.auth).Post("/profile", h.updateUserProfile)
