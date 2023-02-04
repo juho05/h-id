@@ -2,7 +2,7 @@
 
 ## Description
 
-H-ID is an identity service for H-* applications.
+H-ID is an [OpenID Connect](https://openid.net/connect/) identity provider for H-* applications.
 
 ## Setup
 
@@ -44,7 +44,7 @@ make clean
 
 ## License
 
-Copyright (c) 2022 Julian Hofmann
+Copyright (c) 2023 Julian Hofmann
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published
