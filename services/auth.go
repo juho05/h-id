@@ -77,11 +77,12 @@ type authService struct {
 }
 
 type AuthRequest struct {
-	ClientID    string
-	RedirectURI string
-	Scopes      []string
-	State       string
-	Nonce       string
+	ClientID     string
+	RedirectURI  string
+	Scopes       []string
+	State        string
+	Nonce        string
+	NeedsConsent bool
 }
 
 func NewAuthService(userRepository repos.UserRepository, tokenRepository repos.TokenRepository, oauthRepository repos.OAuthRepository, clientRepository repos.ClientRepository, sessionManager *scs.SessionManager, emailService EmailService) AuthService {
@@ -116,12 +117,26 @@ func (a *authService) StartOAuthCodeFlow(ctx context.Context, clientID, redirect
 		}
 	}
 
+	needsConsent := false
+	permissions, err := a.oauthRepo.FindPermissions(ctx, clientID, a.AuthenticatedUserID(ctx))
+	if err == nil {
+		for _, s := range scopes {
+			if !slices.Contains(permissions.Scopes, s) {
+				needsConsent = true
+				break
+			}
+		}
+	} else {
+		needsConsent = true
+	}
+
 	a.sessionManager.Put(ctx, "authRequest", AuthRequest{
-		ClientID:    clientID,
-		RedirectURI: redirectURI,
-		Scopes:      scopes,
-		State:       state,
-		Nonce:       nonce,
+		ClientID:     clientID,
+		RedirectURI:  redirectURI,
+		Scopes:       scopes,
+		State:        state,
+		Nonce:        nonce,
+		NeedsConsent: needsConsent,
 	})
 
 	return nil
@@ -142,6 +157,11 @@ func (a *authService) OAuthConsent(ctx context.Context) (string, error) {
 	}
 	code := generateToken(64)
 	codeHash := hashTokenWeak(code)
+
+	_, err = a.oauthRepo.SetPermissions(ctx, req.ClientID, a.AuthenticatedUserID(ctx), req.Scopes)
+	if err != nil {
+		return "", fmt.Errorf("OAuth consent: %w", err)
+	}
 
 	_, err = a.oauthRepo.Create(ctx, req.ClientID, a.AuthenticatedUserID(ctx), repos.OAuthTokenCode, codeHash, req.RedirectURI, req.Scopes, []byte(req.Nonce), 1*time.Minute)
 	if err != nil {

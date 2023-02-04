@@ -23,7 +23,7 @@ func run() error {
 
 	db, err := sqlite.Connect(config.DBConnection())
 	if err != nil {
-		return fmt.Errorf("Failed to connect to database:", err)
+		return fmt.Errorf("Failed to connect to database: %w", err)
 	}
 	defer db.Close()
 

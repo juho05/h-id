@@ -83,3 +83,52 @@ func (a *oauthRepository) DeleteByUser(ctx context.Context, clientID, userID str
 	}
 	return nil
 }
+
+func (a *oauthRepository) SetPermissions(ctx context.Context, clientID, userID string, scopes []string) (*repos.PermissionsModel, error) {
+	model := &repos.PermissionsModel{
+		CreatedAt: time.Now().Unix(),
+		ClientID:  clientID,
+		UserID:    userID,
+		Scopes:    scopes,
+	}
+	_, err := a.db.ExecContext(ctx, "REPLACE INTO permissions (created_at, client_id, user_id, scopes) VALUES (?, ?, ?, ?)", model.CreatedAt, model.ClientID, model.UserID, model.Scopes)
+	if err != nil {
+		return nil, fmt.Errorf("set permissions: %w", err)
+	}
+	return model, nil
+}
+
+func (a *oauthRepository) FindAllPermissions(ctx context.Context, userID string) ([]*repos.PermissionsModel, error) {
+	var model []*repos.PermissionsModel
+	err := a.db.SelectContext(ctx, &model, "SELECT * FROM permissions WHERE user_id = ?", userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			err = repos.ErrNoRecord
+		}
+		return nil, fmt.Errorf("find all permissions: %w", err)
+	}
+	return model, nil
+}
+
+func (a *oauthRepository) FindPermissions(ctx context.Context, clientID, userID string) (*repos.PermissionsModel, error) {
+	var model repos.PermissionsModel
+	err := a.db.GetContext(ctx, &model, "SELECT * FROM permissions WHERE client_id = ? AND user_id = ?", clientID, userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			err = repos.ErrNoRecord
+		}
+		return nil, fmt.Errorf("find permissions: %w", err)
+	}
+	return &model, nil
+}
+
+func (a *oauthRepository) RevokePermissions(ctx context.Context, clientID, userID string) error {
+	result, err := a.db.ExecContext(ctx, "DELETE FROM permissions WHERE client_id = ? AND user_id = ?", clientID, userID)
+	if err != nil {
+		return fmt.Errorf("revoke permissions: %w", err)
+	}
+	if rows, err := result.RowsAffected(); err == nil && rows == 0 {
+		return fmt.Errorf("revoke permissions: %w", repos.ErrNoRecord)
+	}
+	return nil
+}

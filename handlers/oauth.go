@@ -87,6 +87,28 @@ func (h *Handler) oauthConsentPage(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	if !authRequest.NeedsConsent {
+		code, err := h.AuthService.OAuthConsent(r.Context())
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+
+		redirect, err := url.Parse(authRequest.RedirectURI)
+		if err != nil {
+			serverError(w, fmt.Errorf("oauth consent page handler: %w", err))
+			return
+		}
+
+		q := redirect.Query()
+		q.Add("code", code)
+		if authRequest.State != "" {
+			q.Add("state", authRequest.State)
+		}
+		redirect.RawQuery = q.Encode()
+		http.Redirect(w, r, redirect.String(), http.StatusSeeOther)
+		return
+	}
 
 	client, err := h.ClientService.Find(r.Context(), authRequest.ClientID)
 	if err != nil {
