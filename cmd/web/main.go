@@ -69,6 +69,7 @@ func run() error {
 
 func main() {
 	godotenv.Load()
+	hid.Initialize()
 
 	log.SetSeverity(config.LogLevel())
 	log.SetOutput(config.LogFile())

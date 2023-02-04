@@ -254,7 +254,7 @@ func (a *authService) createIDToken(clientID, userID, nonce string) (string, err
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims{
 		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    "https://id.julianh.de",
+			Issuer:    config.BaseURL(),
 			Subject:   userID,
 			Audience:  jwt.ClaimStrings{clientID},
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * time.Minute)),

@@ -1,24 +1,22 @@
 package hid
 
 import (
+	"bytes"
 	"embed"
 	"encoding/json"
 	"io/fs"
+	"text/template"
 	"time"
 
 	"github.com/Bananenpro/log"
+
+	"github.com/Bananenpro/h-id/config"
 )
 
 var StartTime = time.Now()
 
-//go:embed data/html
-var htmlFS embed.FS
-
-//go:embed data/static
-var staticFS embed.FS
-
-//go:embed data/email
-var emailFS embed.FS
+//go:embed data
+var dataFS embed.FS
 
 var (
 	HTMLFS   fs.FS
@@ -26,29 +24,43 @@ var (
 	EmailFS  fs.FS
 )
 
-//go:embed data/openid_configuration.json
 var OpenIDConfiguration []byte
 
 //go:embed data/default_profile_picture.jpg
 var DefaultProfilePicture []byte
 
-func init() {
+func Initialize() {
 	var err error
-	HTMLFS, err = fs.Sub(htmlFS, "data/html")
+	HTMLFS, err = fs.Sub(dataFS, "data/html")
 	if err != nil {
 		log.Fatal(err)
 	}
-	StaticFS, err = fs.Sub(staticFS, "data/static")
+	StaticFS, err = fs.Sub(dataFS, "data/static")
 	if err != nil {
 		log.Fatal(err)
 	}
-	EmailFS, err = fs.Sub(emailFS, "data/email")
+	EmailFS, err = fs.Sub(dataFS, "data/email")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	openIDConfig, err := template.ParseFS(dataFS, "data/openid_configuration.tmpl.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+	type tmplData struct {
+		BaseURL string
+	}
+	buffer := bytes.Buffer{}
+	err = openIDConfig.Execute(&buffer, tmplData{
+		BaseURL: config.BaseURL(),
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	var oidConfig map[string]any
-	err = json.Unmarshal(OpenIDConfiguration, &oidConfig)
+	err = json.Unmarshal(buffer.Bytes(), &oidConfig)
 	if err != nil {
 		log.Fatal(err)
 	}

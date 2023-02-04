@@ -283,3 +283,17 @@ func ProfilePictureSize() (size int) {
 	}
 	return size
 }
+
+func BaseURL() (u string) {
+	if v, ok := values["BASE_URL"]; ok {
+		return v.(string)
+	}
+	defer func() {
+		values["BASE_URL"] = u
+	}()
+	u = os.Getenv("BASE_URL")
+	if u == "" {
+		log.Fatal("BASE_URL must not be empty")
+	}
+	return strings.TrimSuffix(u, "/")
+}

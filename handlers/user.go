@@ -247,7 +247,7 @@ func (h *Handler) userInfo(w http.ResponseWriter, r *http.Request) {
 
 	resp := response{
 		Subject: user.ID,
-		Picture: "https://id.julianh.de/user/" + user.ID + "/picture",
+		Picture: config.BaseURL() + "/user/" + user.ID + "/picture",
 	}
 	for _, scope := range h.AuthService.AuthorizedScopes(r.Context()) {
 		switch scope {
