@@ -13,6 +13,7 @@ import (
 	"github.com/disintegration/imaging"
 	"github.com/go-chi/chi/v5"
 
+	"github.com/Bananenpro/h-id/config"
 	"github.com/Bananenpro/h-id/repos"
 	"github.com/Bananenpro/h-id/services"
 )
@@ -342,12 +343,12 @@ func (h *Handler) updateUserProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) profilePicture(w http.ResponseWriter, r *http.Request) {
-	size := 512
+	size := config.ProfilePictureSize()
 	if s, err := strconv.Atoi(r.URL.Query().Get("size")); err == nil {
 		size = s
 	}
-	if size > 512 {
-		size = 512
+	if size > config.ProfilePictureSize() {
+		size = config.ProfilePictureSize()
 	}
 
 	userID := chi.URLParam(r, "id")

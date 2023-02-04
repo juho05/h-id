@@ -78,7 +78,7 @@ func (u *userService) SetProfilePicture(userID string, img image.Image) error {
 	}
 	defer file.Close()
 
-	err = imaging.Encode(file, imaging.Resize(img, 512, 512, imaging.Linear), imaging.JPEG, imaging.JPEGQuality(90))
+	err = imaging.Encode(file, imaging.Resize(img, config.ProfilePictureSize(), config.ProfilePictureSize(), imaging.Linear), imaging.JPEG, imaging.JPEGQuality(90))
 	if err != nil {
 		return fmt.Errorf("set profile picture: %w", err)
 	}

@@ -263,3 +263,23 @@ func ProfilePictureDir() (dir string) {
 
 	return dir
 }
+
+func ProfilePictureSize() (size int) {
+	if s, ok := values["PROFILE_PICTURE_SIZE"]; ok {
+		return s.(int)
+	}
+	defer func() {
+		values["PROFILE_PICTURE_SIZE"] = size
+	}()
+	def := 1024
+	sizeStr := os.Getenv("PROFILE_PICTURE_SIZE")
+	if sizeStr == "" {
+		return def
+	}
+	size, err := strconv.Atoi(sizeStr)
+	if err != nil {
+		log.Errorf("Invalid profile picture size '%s': not a number. Using default: %d", sizeStr, def)
+		return def
+	}
+	return size
+}
