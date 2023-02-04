@@ -30,6 +30,7 @@ import (
 
 type AuthService interface {
 	Login(ctx context.Context, email, password string) error
+	Logout(ctx context.Context) error
 	HashPassword(password string) ([]byte, error)
 	VerifyPassword(user *repos.UserModel, password string) error
 	VerifyPasswordByID(ctx context.Context, id, password string) error
@@ -390,6 +391,15 @@ func (a *authService) Login(ctx context.Context, email, password string) error {
 	}
 
 	a.sessionManager.Put(ctx, "authUserID", user.ID)
+	return nil
+}
+
+func (a *authService) Logout(ctx context.Context) error {
+	err := a.sessionManager.RenewToken(ctx)
+	if err != nil {
+		return fmt.Errorf("logout: %w", err)
+	}
+	a.sessionManager.Remove(ctx, "authUserID")
 	return nil
 }
 

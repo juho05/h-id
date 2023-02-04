@@ -30,10 +30,16 @@ header {
 .nav-link {
   color: white;
   text-decoration: none;
+  font: inherit;
   font-weight: 500;
   font-size: 14pt;
   display: inline-block;
   margin-left: 15px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  outline: inherit;
 }
 
 nav {

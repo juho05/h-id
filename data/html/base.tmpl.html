@@ -17,8 +17,11 @@
         <a class="nav-link" href="/user/login">Login</a>
         <a class="nav-link" href="/user/signup">Sign up</a>
         {{else}}
-        <a class="nav-link" href="/app/list">Apps</a>
-        <a class="nav-link" href="/user/profile">Account</a>
+        <form action="/user/logout" method="post">
+          <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+          <a class="nav-link" href="/user/profile">Account</a>
+          <button class="nav-link">Logout</button>
+        </form>
         {{end}}
       </nav>
     </header>

@@ -22,6 +22,7 @@ func (h *Handler) userRoutes(r chi.Router) {
 	r.Post("/signup", h.userSignUp)
 	r.Get("/login", h.userLoginPage)
 	r.Post("/login", h.userLogin)
+	r.With(h.auth).Post("/logout", h.userLogout)
 
 	r.Get("/confirmEmail", h.userConfirmEmailPage)
 	r.Post("/confirmEmail", h.userConfirmEmail)
@@ -137,6 +138,16 @@ func (h *Handler) userLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+}
+
+// POST /user/logout
+func (h *Handler) userLogout(w http.ResponseWriter, r *http.Request) {
+	err := h.AuthService.Logout(r.Context())
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 // GET /user/confirmEmail
