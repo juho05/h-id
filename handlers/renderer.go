@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"github.com/justinas/nosurf"
+
+	"github.com/Bananenpro/h-id/config"
 )
 
 type templateData struct {
@@ -18,6 +20,7 @@ type templateData struct {
 	FieldErrors map[string]string
 	Errors      []string
 	CSRFToken   string
+	SiteKey     string
 	UserID      string
 }
 
@@ -25,6 +28,7 @@ func (h *Handler) newTemplateData(r *http.Request) templateData {
 	return templateData{
 		FieldErrors: make(map[string]string),
 		CSRFToken:   nosurf.Token(r),
+		SiteKey:     config.HCaptchaSiteKey(),
 		UserID:      h.AuthService.AuthenticatedUserID(r.Context()),
 	}
 }

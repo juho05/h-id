@@ -16,6 +16,7 @@ import (
 
 	hid "github.com/Bananenpro/h-id"
 
+	"github.com/Bananenpro/h-id/config"
 	"github.com/Bananenpro/h-id/services"
 )
 
@@ -156,7 +157,11 @@ func staticCache(maxAge time.Duration) func(next http.Handler) http.Handler {
 
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Security-Policy", "default-src 'self';style-src 'self';frame-src 'self';script-src 'self'; connect-src 'self';")
+		if config.HCaptchaSiteKey() != "" {
+			w.Header().Set("Content-Security-Policy", "default-src 'self';style-src 'self' https://hcaptcha.com https://*.hcaptcha.com;frame-src 'self' https://hcaptcha.com https://*.hcaptcha.com;script-src 'self' https://hcaptcha.com https://*.hcaptcha.com; connect-src 'self' https://hcaptcha.com https://*.hcaptcha.com;")
+		} else {
+			w.Header().Set("Content-Security-Policy", "default-src 'self';style-src 'self';frame-src 'self';script-src 'self'; connect-src 'self';")
+		}
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Permissions-Policy", "geolocation=(), camera=(), microphone=()")

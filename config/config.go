@@ -297,3 +297,29 @@ func BaseURL() (u string) {
 	}
 	return strings.TrimSuffix(u, "/")
 }
+
+func HCaptchaSiteKey() (key string) {
+	if k, ok := values["HCAPTCHA_SITE_KEY"]; ok {
+		return k.(string)
+	}
+	defer func() {
+		values["HCAPTCHA_SITE_KEY"] = key
+	}()
+	key = os.Getenv("HCAPTCHA_SITE_KEY")
+
+	if key == "" {
+		log.Warn("Empty HCAPTCHA_SITE_KEY. CAPTCHA verification is disabled.")
+	}
+
+	return key
+}
+
+func HCaptchaSecret() (secret string) {
+	if s, ok := values["HCAPTCHA_SECRET"]; ok {
+		return s.(string)
+	}
+	defer func() {
+		values["HCAPTCHA_SECRET"] = secret
+	}()
+	return os.Getenv("HCAPTCHA_SECRET")
+}

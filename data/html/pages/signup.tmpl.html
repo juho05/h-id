@@ -31,6 +31,12 @@
       <input class="{{if .FieldErrors.RepeatPassword}}invalid-field{{end}}" id="repeatPassword" type="password" name="repeatPassword" required>
       {{with .FieldErrors.RepeatPassword}}<label class="error-label" for="repeatPassword">{{.}}</label>{{end}}
 
+      {{if .SiteKey}}
+      <div class="h-captcha" data-sitekey="{{.SiteKey}}" data-theme="dark"></div>
+      <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
+      {{with .FieldErrors.Captcha}}<label class="error-label">{{.}}</label>{{end}}
+      {{end}}
+
       <a class="input-label" href="/user/login?redirect={{.Data.LoginRedirect}}">Sign in instead</a>
     </div>
     <div class="submit-div">

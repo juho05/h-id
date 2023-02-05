@@ -43,7 +43,10 @@ func (h *Handler) userSignUpPage(w http.ResponseWriter, r *http.Request) {
 	if redirect := h.SessionManager.GetString(r.Context(), "loginRedirect"); redirect != "" {
 		data.LoginRedirect = url.QueryEscape(redirect)
 	}
-	h.Renderer.render(w, http.StatusSeeOther, "signup", h.newTemplateDataWithData(r, data))
+	if config.HCaptchaSiteKey() != "" {
+		w.Header().Set("Cross-Origin-Embedder-Policy", "unsafe-none")
+	}
+	h.Renderer.render(w, http.StatusOK, "signup", h.newTemplateDataWithData(r, data))
 }
 
 // POST /user/signup
@@ -54,7 +57,13 @@ func (h *Handler) userSignUp(w http.ResponseWriter, r *http.Request) {
 		Password       string `form:"password" validate:"required,min=6,maxsize=72"`
 		RepeatPassword string `form:"repeatPassword" validate:"required,eqfield=Password"`
 	}
-	body, ok := decodeAndValidateBody[request](h, w, r, "signup", nil)
+	type tmplData struct {
+		LoginRedirect string
+	}
+	data := h.newTemplateDataWithData(r, tmplData{
+		LoginRedirect: url.QueryEscape(h.SessionManager.GetString(r.Context(), "loginRedirect")),
+	})
+	body, ok := decodeAndValidateBodyWithCaptcha[request](h, w, r, "signup", &data)
 	if !ok {
 		return
 	}
@@ -62,15 +71,11 @@ func (h *Handler) userSignUp(w http.ResponseWriter, r *http.Request) {
 	user, err := h.UserService.Create(r.Context(), body.Name, body.Email, body.Password)
 	if err != nil {
 		if errors.Is(err, repos.ErrDuplicateEmail) {
-
-			type tmplData struct {
-				LoginRedirect string
-			}
-			data := h.newTemplateDataWithData(r, tmplData{
-				LoginRedirect: url.QueryEscape(h.SessionManager.GetString(r.Context(), "loginRedirect")),
-			})
 			data.Errors = []string{"The user already exists."}
 			data.Form = body
+			if config.HCaptchaSiteKey() != "" {
+				w.Header().Set("Cross-Origin-Embedder-Policy", "unsafe-none")
+			}
 			h.Renderer.render(w, http.StatusUnprocessableEntity, "signup", data)
 		} else {
 			serverError(w, err)

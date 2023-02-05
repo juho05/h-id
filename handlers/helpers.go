@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"mime"
 	"net/http"
+	"net/url"
 	"reflect"
 	"runtime/debug"
 	"strconv"
@@ -19,6 +20,7 @@ import (
 	"github.com/go-playground/validator/v10/non-standard/validators"
 	entrans "github.com/go-playground/validator/v10/translations/en"
 
+	"github.com/Bananenpro/h-id/config"
 	"github.com/Bananenpro/h-id/repos"
 )
 
@@ -88,6 +90,66 @@ func decodeAndValidateBody[T any](handler *Handler, w http.ResponseWriter, r *ht
 	}
 
 	invalid := findInvalidFields(data)
+	if len(invalid) > 0 {
+		if templateData == nil {
+			d := handler.newTemplateData(r)
+			templateData = &d
+		}
+		templateData.Form = data
+		templateData.FieldErrors = invalid
+		handler.Renderer.render(w, http.StatusUnprocessableEntity, page, *templateData)
+		return data, false
+	}
+
+	return data, true
+}
+
+func decodeAndValidateBodyWithCaptcha[T any](handler *Handler, w http.ResponseWriter, r *http.Request, page string, templateData *templateData) (data T, ok bool) {
+	data, err := decodeBody[T](r)
+	if err != nil {
+		badRequest(w)
+		return data, false
+	}
+
+	invalid := findInvalidFields(data)
+
+	if config.HCaptchaSiteKey() != "" {
+		hcaptchaResponse := r.PostForm.Get("h-captcha-response")
+
+		values := url.Values{}
+		values.Set("response", hcaptchaResponse)
+		values.Set("secret", config.HCaptchaSecret())
+		values.Set("sitekey", config.HCaptchaSiteKey())
+		resp, err := http.PostForm("https://hcaptcha.com/siteverify", values)
+		if err != nil {
+			serverError(w, fmt.Errorf("verify captcha response: %w", err))
+			return
+		}
+		defer resp.Body.Close()
+		type response struct {
+			Success    bool     `json:"success"`
+			ErrorCodes []string `json:"error-codes"`
+		}
+		var res response
+		err = json.NewDecoder(resp.Body).Decode(&res)
+		if err != nil {
+			serverError(w, fmt.Errorf("decode captcha siteverify response: %w", err))
+			return
+		}
+		if !res.Success {
+			if invalid == nil {
+				invalid = make(map[string]string)
+			}
+			invalid["Captcha"] = "Please solve the CAPTCHA challenge"
+			for _, e := range res.ErrorCodes {
+				if e != "missing-input-response" && e != "invalid-input-response" && e != "invalid-or-already-seen-response" {
+					log.Error(fmt.Sprintf("captcha siteverify: %s", e))
+				}
+			}
+		}
+		w.Header().Set("Cross-Origin-Embedder-Policy", "unsafe-none")
+	}
+
 	if len(invalid) > 0 {
 		if templateData == nil {
 			d := handler.newTemplateData(r)
