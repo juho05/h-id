@@ -2,7 +2,7 @@ OUT_DIR=bin
 BIN_NAME=h-id
 
 build:
-	go build -o ${OUT_DIR}/${BIN_NAME} ./cmd/web
+	CGO_ENABLED=0 go build -o ${OUT_DIR}/${BIN_NAME} ./cmd/web
 
 run:
 	go run ./cmd/web

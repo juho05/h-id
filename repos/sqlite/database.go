@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/oklog/ulid/v2"
+	_ "modernc.org/sqlite"
 
 	"github.com/Bananenpro/h-id/repos"
 )
@@ -15,7 +15,7 @@ type DB struct {
 }
 
 func Connect(connectionString string) (repos.DB, error) {
-	db, err := sqlx.Connect("sqlite3", connectionString)
+	db, err := sqlx.Connect("sqlite", connectionString)
 	if err != nil {
 		return nil, err
 	}

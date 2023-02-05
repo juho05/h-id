@@ -8,7 +8,8 @@ import (
 	"strings"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/mattn/go-sqlite3"
+	"modernc.org/sqlite"
+	sqlite3 "modernc.org/sqlite/lib"
 
 	"github.com/Bananenpro/h-id/repos"
 )
@@ -69,8 +70,8 @@ func (u *userRepository) Create(ctx context.Context, name, email string, passwor
 	}
 	_, err := u.db.ExecContext(ctx, "INSERT INTO users (id, created_at, name, email, email_confirmed, password_hash) VALUES (?, ?, ?, ?, ?, ?)", user.ID, user.CreatedAt, user.Name, user.Email, user.EmailConfirmed, user.PasswordHash)
 	if err != nil {
-		var sqliteErr sqlite3.Error
-		if errors.As(err, &sqliteErr) && sqliteErr.Code == sqlite3.ErrConstraint && strings.Contains(sqliteErr.Error(), "email") {
+		var sqliteErr *sqlite.Error
+		if errors.As(err, &sqliteErr) && sqliteErr.Code() == sqlite3.SQLITE_CONSTRAINT_UNIQUE && strings.Contains(sqliteErr.Error(), "email") {
 			err = repos.ErrDuplicateEmail
 		}
 		return nil, fmt.Errorf("create user: %w", err)

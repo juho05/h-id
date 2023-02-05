@@ -112,7 +112,7 @@ func DBConnection() (con string) {
 	defer func() {
 		values["DB_CONNECTION"] = con
 	}()
-	def := "database.sqlite?_foreign_keys=1"
+	def := "database.sqlite?_pragma=foreign_keys(1)"
 	con = os.Getenv("DB_CONNECTION")
 	if con == "" {
 		return def

@@ -10,7 +10,6 @@ H-ID is an [OpenID Connect](https://openid.net/connect/) identity provider for H
 
 - [Go](https://go.dev/) 1.20+
 - [GNU Make](https://www.gnu.org/software/make)
-- gcc
 
 ### Apply database migrations
 
