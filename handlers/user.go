@@ -348,7 +348,7 @@ func (h *Handler) updateUserProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) profilePicture(w http.ResponseWriter, r *http.Request) {
-	size := config.ProfilePictureSize()
+	size := 512
 	if s, err := strconv.Atoi(r.URL.Query().Get("size")); err == nil {
 		size = s
 	}
