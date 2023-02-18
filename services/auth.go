@@ -3,7 +3,7 @@ package services
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha512"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/gob"
 	"errors"
@@ -469,11 +469,11 @@ func generateToken(length int) string {
 }
 
 func hashToken(token string) []byte {
-	return pbkdf2.Key([]byte(token), []byte("salt"), 100000, 64, sha512.New)
+	return pbkdf2.Key([]byte(token), []byte("salt"), 100000, 256, sha256.New)
 }
 
 func hashTokenWeak(token string) []byte {
-	return pbkdf2.Key([]byte(token), []byte("salt"), 10000, 64, sha512.New)
+	return pbkdf2.Key([]byte(token), []byte("salt"), 10000, 256, sha256.New)
 }
 
 func (a *authService) DescribeScopes(scopes []string) []string {
