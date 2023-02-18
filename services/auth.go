@@ -183,7 +183,7 @@ func (a *authService) OAuthGenerateTokens(ctx context.Context, clientID, clientS
 		hash = hashTokenWeak(grant)
 		tokenType = repos.OAuthTokenCode
 	case "refresh_token":
-		hash = hashToken(grant)
+		hash = hashTokenWeak(grant)
 		tokenType = repos.OAuthTokenRefresh
 	default:
 		return "", "", "", ErrUnsupportedGrantType
@@ -219,7 +219,7 @@ func (a *authService) OAuthGenerateTokens(ctx context.Context, clientID, clientS
 	access := generateToken(64)
 	accessHash := hashTokenWeak(access)
 	refresh := generateToken(128)
-	refreshHash := hashToken(refresh)
+	refreshHash := hashTokenWeak(refresh)
 
 	_, err = a.oauthRepo.Create(ctx, token.ClientID, token.UserID, repos.OAuthTokenAccess, accessHash, "", token.Scopes, nil, 30*time.Minute)
 	if err != nil {
