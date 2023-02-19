@@ -469,11 +469,11 @@ func generateToken(length int) string {
 }
 
 func hashToken(token string) []byte {
-	return pbkdf2.Key([]byte(token), []byte("salt"), 100000, 256, sha256.New)
+	return pbkdf2.Key([]byte(token), []byte("salt"), 10000, 256, sha256.New)
 }
 
 func hashTokenWeak(token string) []byte {
-	return pbkdf2.Key([]byte(token), []byte("salt"), 10000, 256, sha256.New)
+	return pbkdf2.Key([]byte(token), []byte("salt"), 5000, 256, sha256.New)
 }
 
 func (a *authService) DescribeScopes(scopes []string) []string {
