@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/Bananenpro/h-id/repos"
+	"github.com/juho05/h-id/repos"
 )
 
 func (h *Handler) appRoutes(r chi.Router) {

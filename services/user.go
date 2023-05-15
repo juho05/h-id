@@ -16,10 +16,10 @@ import (
 
 	"github.com/Bananenpro/log"
 
-	hid "github.com/Bananenpro/h-id"
+	hid "github.com/juho05/h-id"
 
-	"github.com/Bananenpro/h-id/config"
-	"github.com/Bananenpro/h-id/repos"
+	"github.com/juho05/h-id/config"
+	"github.com/juho05/h-id/repos"
 )
 
 type UserService interface {

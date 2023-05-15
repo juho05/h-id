@@ -11,7 +11,7 @@ import (
 	"modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 
-	"github.com/Bananenpro/h-id/repos"
+	"github.com/juho05/h-id/repos"
 )
 
 type userRepository struct {

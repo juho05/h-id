@@ -10,7 +10,7 @@ import (
 
 	"github.com/Bananenpro/log"
 
-	"github.com/Bananenpro/h-id/config"
+	"github.com/juho05/h-id/config"
 )
 
 var StartTime = time.Now()

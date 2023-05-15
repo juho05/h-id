@@ -24,8 +24,8 @@ import (
 
 	"github.com/Bananenpro/log"
 
-	"github.com/Bananenpro/h-id/config"
-	"github.com/Bananenpro/h-id/repos"
+	"github.com/juho05/h-id/config"
+	"github.com/juho05/h-id/repos"
 )
 
 type AuthService interface {

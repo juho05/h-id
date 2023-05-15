@@ -1,4 +1,4 @@
-module github.com/Bananenpro/h-id
+module github.com/juho05/h-id
 
 go 1.20
 

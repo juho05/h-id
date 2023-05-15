@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Bananenpro/h-id/repos"
+	"github.com/juho05/h-id/repos"
 )
 
 type ClientService interface {

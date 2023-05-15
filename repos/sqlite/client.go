@@ -8,7 +8,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
-	"github.com/Bananenpro/h-id/repos"
+	"github.com/juho05/h-id/repos"
 )
 
 type clientRepository struct {

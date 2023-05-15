@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	hid "github.com/Bananenpro/h-id"
+	hid "github.com/juho05/h-id"
 )
 
 func (h *Handler) wellKnownRoutes(r chi.Router) {

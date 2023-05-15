@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Bananenpro/h-id/config"
+	"github.com/juho05/h-id/config"
 )
 
 type EmailService interface {

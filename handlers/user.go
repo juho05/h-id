@@ -13,9 +13,9 @@ import (
 	"github.com/disintegration/imaging"
 	"github.com/go-chi/chi/v5"
 
-	"github.com/Bananenpro/h-id/config"
-	"github.com/Bananenpro/h-id/repos"
-	"github.com/Bananenpro/h-id/services"
+	"github.com/juho05/h-id/config"
+	"github.com/juho05/h-id/repos"
+	"github.com/juho05/h-id/services"
 )
 
 func (h *Handler) userRoutes(r chi.Router) {

@@ -7,7 +7,7 @@ import (
 	"github.com/oklog/ulid/v2"
 	_ "modernc.org/sqlite"
 
-	"github.com/Bananenpro/h-id/repos"
+	"github.com/juho05/h-id/repos"
 )
 
 type DB struct {

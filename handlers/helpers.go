@@ -20,8 +20,8 @@ import (
 	"github.com/go-playground/validator/v10/non-standard/validators"
 	entrans "github.com/go-playground/validator/v10/translations/en"
 
-	"github.com/Bananenpro/h-id/config"
-	"github.com/Bananenpro/h-id/repos"
+	"github.com/juho05/h-id/config"
+	"github.com/juho05/h-id/repos"
 )
 
 var (

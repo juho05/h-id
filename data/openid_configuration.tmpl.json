@@ -11,5 +11,5 @@
   "token_endpoint_auth_methods_supported": ["client_secret_basic"],
   "registration_endpoint": "{{.BaseURL}}/user/signup",
   "grant_types_supported": ["authorization_code", "refresh_token"],
-  "service_documentation": "https://github.com/Bananenpro/h-id/blob/main/README.md"
+  "service_documentation": "https://github.com/juho05/h-id/blob/main/README.md"
 }

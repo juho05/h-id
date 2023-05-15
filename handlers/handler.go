@@ -8,7 +8,7 @@ import (
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-chi/chi/v5"
 
-	"github.com/Bananenpro/h-id/services"
+	"github.com/juho05/h-id/services"
 )
 
 type Handler struct {
