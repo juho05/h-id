@@ -1,8 +1,14 @@
 package main
 
 import (
+	"context"
+	"crypto/tls"
+	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/Bananenpro/log"
@@ -58,13 +64,53 @@ func run() error {
 	key := config.TLSKey()
 
 	addr := fmt.Sprintf(":%d", port)
+	server := http.Server{
+		Addr:     addr,
+		Handler:  handler,
+		ErrorLog: log.NewStdLogger(log.ERROR),
+		TLSConfig: &tls.Config{
+			MinVersion:       tls.VersionTLS13,
+			CurvePreferences: []tls.CurveID{tls.CurveP256, tls.X25519},
+			CipherSuites: []uint16{
+				tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+				tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+				tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+				tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+			},
+		},
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	closed := make(chan struct{})
+	go func() {
+		sigint := make(chan os.Signal, 1)
+		signal.Notify(sigint, syscall.SIGINT, syscall.SIGTERM)
+		<-sigint
+		timeout, cancelTimeout := context.WithTimeout(context.Background(), 5*time.Second)
+		log.Info("Shutting down...")
+		server.Shutdown(timeout)
+		cancelTimeout()
+		close(closed)
+	}()
+
 	log.Infof("Listening on %s...", addr)
 
 	if cert != "" && key != "" {
-		return http.ListenAndServeTLS(addr, cert, key, handler)
+		err = server.ListenAndServeTLS(cert, key)
 	} else {
-		return http.ListenAndServe(addr, handler)
+		err = server.ListenAndServe()
 	}
+	if errors.Is(err, http.ErrServerClosed) {
+		err = nil
+	}
+	if err == nil {
+		<-closed
+	}
+	return err
 }
 
 func main() {
@@ -78,4 +124,5 @@ func main() {
 	if err != nil {
 		log.Fatalf("%s", err)
 	}
+	log.Info("Shutdown complete.")
 }
