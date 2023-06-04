@@ -168,7 +168,11 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("Referrer-Policy", "same-origin")
 		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
 		w.Header().Set("Cross-Origin-Embedder-Policy", "require-corp")
-		w.Header().Set("Cross-Origin-Resource-Policy", "same-site")
+		if strings.HasPrefix(r.URL.Path, "/user/") && strings.HasSuffix(r.URL.Path, "/picture") {
+			w.Header().Set("Cross-Origin-Resource-Policy", "cross-origin")
+		} else {
+			w.Header().Set("Cross-Origin-Resource-Policy", "same-site")
+		}
 		w.Header().Set("Permissions-Policy", "interest-cohort=()")
 		w.Header().Set("Form-Action", "'self'")
 		w.Header().Set("Base-Uri", "'none'")
