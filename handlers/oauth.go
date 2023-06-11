@@ -122,7 +122,7 @@ func (h *Handler) oauthConsentPage(w http.ResponseWriter, r *http.Request) {
 		ClientWebsite     string
 		Scopes            []string
 	}
-	h.Renderer.render(w, http.StatusOK, "oauthConsent", h.newTemplateDataWithData(r, tmplData{
+	h.Renderer.render(w, r, http.StatusOK, "oauthConsent", h.newTemplateDataWithData(r, tmplData{
 		ClientName:        client.Name,
 		ClientDescription: client.Description,
 		ClientWebsite:     client.Website,

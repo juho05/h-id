@@ -1,8 +1,8 @@
-{{define "title"}}Create App{{end}}
+{{define "title"}}{{translate .Lang "createApp"}}{{end}}
 
 {{define "main"}}
 <div class="form-panel">
-  <h2 class="form-title">Create App</h2>
+  <h2 class="form-title">{{translate .Lang "createApp"}}</h2>
   {{with .Errors}}
   <ul class="error-list">
     {{range .}}
@@ -14,24 +14,24 @@
     <div>
       <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 
-      <label class="input-label" for="name">Name:</label>
+      <label class="input-label" for="name">{{translate .Lang "name"}}:</label>
       <input class="{{if .FieldErrors.Name}}invalid-field{{end}}" id="name" type="text" name="name" {{with .Form}}value="{{.Name}}"{{end}} required>
         {{with .FieldErrors.Name}}<label class="error-label" for="name">{{.}}</label>{{end}}
 
-      <label class="input-label" for="description">Description:</label>
+      <label class="input-label" for="description">{{translate .Lang "description"}}:</label>
       <textarea class="{{if .FieldErrors.Description}}invalid-field{{end}}" rows="6" id="description" name="description">{{with .Form}}{{.Description}}{{end}}</textarea>
       {{with .FieldErrors.Description}}<label class="error-label" for="description">{{.}}</label>{{end}}
 
-      <label class="input-label" for="website">Website:</label>
+      <label class="input-label" for="website">{{translate .Lang "website"}}:</label>
       <input class="{{if .FieldErrors.Website}}invalid-field{{end}}" id="website" type="url" name="website" {{with .Form}}value="{{.Website}}"{{end}} required>
         {{with .FieldErrors.Website}}<label class="error-label" for="website">{{.}}</label>{{end}}
 
-      <label class="input-label" for="redirectURI">Redirect URI:</label>
+      <label class="input-label" for="redirectURI">{{translate .Lang "redirectURI"}}:</label>
       <input class="{{if .FieldErrors.RedirectURIs0}}invalid-field{{end}}" id="redirectURI" type="url" name="redirectURIs" {{with .Form}}{{with .RedirectURIs}}value="{{index . 0}}"{{end}}{{end}} required>
       {{with .FieldErrors.RedirectURIs0}}<label class="error-label" for="redirectURI">{{.}}</label>{{end}}
     </div>
     <div class="submit-div">
-      <input class="btn" type="submit" value="Create">
+      <input class="btn" type="submit" value="{{translate .Lang "create"}}">
     </div>
   </form>
 </div>

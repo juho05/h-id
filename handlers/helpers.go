@@ -14,6 +14,7 @@ import (
 
 	"github.com/Bananenpro/log"
 	"github.com/go-playground/form/v4"
+	"github.com/go-playground/locales/de"
 	"github.com/go-playground/locales/en"
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
@@ -22,11 +23,13 @@ import (
 
 	"github.com/juho05/h-id/config"
 	"github.com/juho05/h-id/repos"
+	"github.com/juho05/h-id/services"
 )
 
 var (
 	validate *validator.Validate
 	enTrans  ut.Translator
+	deTrans  ut.Translator
 )
 
 func maxSize(fl validator.FieldLevel) bool {
@@ -47,14 +50,25 @@ func init() {
 	validate.RegisterValidation("maxsize", maxSize)
 
 	en := en.New()
-	uni := ut.New(en, en)
+	de := de.New()
+	uni := ut.New(en, en, de)
 	enTrans, _ = uni.GetTranslator("en")
+	deTrans, _ = uni.GetTranslator("de")
 	entrans.RegisterDefaultTranslations(validate, enTrans)
+	services.RegisterDETranslations(validate, deTrans)
 	err := validate.RegisterTranslation("notblank", enTrans, registrationFunc("notblank", "{0} must not be blank"), translateFunc)
 	if err != nil {
 		log.Fatal(err)
 	}
 	err = validate.RegisterTranslation("maxsize", enTrans, registrationFunc("maxsize", "{0} must not exceed {1} bytes"), translateFunc)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = validate.RegisterTranslation("notblank", deTrans, registrationFunc("notblank", "{0} darf nicht leer sein"), translateFunc)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = validate.RegisterTranslation("maxsize", deTrans, registrationFunc("maxsize", "{0} darf nicht größer als {1} bytes sein"), translateFunc)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -89,7 +103,8 @@ func decodeAndValidateBody[T any](handler *Handler, w http.ResponseWriter, r *ht
 		return data, false
 	}
 
-	invalid := findInvalidFields(data)
+	lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
+	invalid := findInvalidFields(lang, data)
 	if len(invalid) > 0 {
 		if templateData == nil {
 			d := handler.newTemplateData(r)
@@ -97,7 +112,7 @@ func decodeAndValidateBody[T any](handler *Handler, w http.ResponseWriter, r *ht
 		}
 		templateData.Form = data
 		templateData.FieldErrors = invalid
-		handler.Renderer.render(w, http.StatusUnprocessableEntity, page, *templateData)
+		handler.Renderer.render(w, r, http.StatusUnprocessableEntity, page, *templateData)
 		return data, false
 	}
 
@@ -111,7 +126,8 @@ func decodeAndValidateBodyWithCaptcha[T any](handler *Handler, w http.ResponseWr
 		return data, false
 	}
 
-	invalid := findInvalidFields(data)
+	lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
+	invalid := findInvalidFields(lang, data)
 
 	if config.HCaptchaSiteKey() != "" {
 		hcaptchaResponse := r.PostForm.Get("h-captcha-response")
@@ -157,7 +173,7 @@ func decodeAndValidateBodyWithCaptcha[T any](handler *Handler, w http.ResponseWr
 		}
 		templateData.Form = data
 		templateData.FieldErrors = invalid
-		handler.Renderer.render(w, http.StatusUnprocessableEntity, page, *templateData)
+		handler.Renderer.render(w, r, http.StatusUnprocessableEntity, page, *templateData)
 		return data, false
 	}
 
@@ -187,7 +203,7 @@ func decodeBody[T any](r *http.Request) (T, error) {
 	return obj, err
 }
 
-func findInvalidFields(obj any) map[string]string {
+func findInvalidFields(lang string, obj any) map[string]string {
 	err := validate.Struct(obj)
 	if e, ok := err.(*validator.InvalidValidationError); ok {
 		panic(e)
@@ -200,7 +216,11 @@ func findInvalidFields(obj any) map[string]string {
 			name := e.StructField()
 			name = strings.ReplaceAll(name, "[", "")
 			name = strings.ReplaceAll(name, "]", "")
-			fields[name] = e.Translate(enTrans)
+			if lang == "de" {
+				fields[name] = e.Translate(deTrans)
+			} else {
+				fields[name] = e.Translate(enTrans)
+			}
 		}
 		return fields
 	}
@@ -209,7 +229,7 @@ func findInvalidFields(obj any) map[string]string {
 
 func (h *Handler) newPage(name string) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		h.Renderer.render(w, http.StatusOK, name, h.newTemplateData(r))
+		h.Renderer.render(w, r, http.StatusOK, name, h.newTemplateData(r))
 	}
 }
 

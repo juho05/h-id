@@ -12,11 +12,13 @@ import (
 	"github.com/justinas/nosurf"
 
 	"github.com/juho05/h-id/config"
+	"github.com/juho05/h-id/services"
 )
 
 type templateData struct {
 	Form        any
 	Data        any
+	Lang        string
 	FieldErrors map[string]string
 	Errors      []string
 	CSRFToken   string
@@ -40,7 +42,7 @@ func (h *Handler) newTemplateDataWithData(r *http.Request, data any) templateDat
 }
 
 type Renderer interface {
-	render(w http.ResponseWriter, status int, page string, data templateData)
+	render(w http.ResponseWriter, r *http.Request, status int, page string, data templateData)
 }
 
 type renderer struct {
@@ -58,15 +60,16 @@ func NewRenderer(htmlFS fs.FS) (Renderer, error) {
 	return renderer, nil
 }
 
-func (r *renderer) render(w http.ResponseWriter, status int, page string, data templateData) {
+func (r *renderer) render(w http.ResponseWriter, req *http.Request, status int, page string, data templateData) {
 	t, ok := r.templates[page]
 	if !ok {
 		serverError(w, fmt.Errorf("template %s does not exist", page))
 		return
 	}
 
+	lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(req.Header["Accept-Language"], ","))
+	data.Lang = lang
 	buf := &bytes.Buffer{}
-
 	err := t.ExecuteTemplate(buf, "base", data)
 	if err != nil {
 		serverError(w, err)
@@ -86,7 +89,9 @@ func (r *renderer) loadTemplates(htmlFS fs.FS) error {
 	for _, page := range pages {
 		name := strings.TrimSuffix(filepath.Base(page), ".tmpl.html")
 
-		t, err := template.New(name).ParseFS(htmlFS, "base.tmpl.html")
+		t, err := template.New(name).Funcs(template.FuncMap{
+			"translate": services.Translate,
+		}).ParseFS(htmlFS, "base.tmpl.html")
 		if err != nil {
 			return fmt.Errorf("parse base.tmpl.html: %w", err)
 		}

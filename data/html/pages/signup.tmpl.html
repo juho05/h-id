@@ -1,8 +1,8 @@
-{{define "title"}}Create account{{end}}
+{{define "title"}}{{translate .Lang "createAccount"}}{{end}}
 
 {{define "main"}}
 <div class="form-panel">
-  <h2 class="form-title">Create account</h2>
+  <h2 class="form-title">{{translate .Lang "createAccount"}}</h2>
   {{with .Errors}}
   <ul class="error-list">
     {{range .}}
@@ -15,19 +15,19 @@
     <div>
       <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 
-      <label class="input-label" for="name">Name:</label>
+      <label class="input-label" for="name">{{translate .Lang "name"}}:</label>
       <input class="{{if .FieldErrors.Name}}invalid-field{{end}}" id="name" type="text" name="name" maxlength="32" {{with .Form}}value="{{.Name}}"{{else}}autofocus{{end}} required >
       {{with .FieldErrors.Name}}<label class="error-label" for="name">{{.}}</label>{{end}}
 
-      <label class="input-label" for="email">Email:</label>
+      <label class="input-label" for="email">{{translate .Lang "email"}}:</label>
       <input class="{{if .FieldErrors.Email}}invalid-field{{end}}" id="email" type="email" name="email" {{with .Form}}value="{{.Email}}"{{end}} required>
       {{with .FieldErrors.Email}}<label class="error-label" for="email">{{.}}</label>{{end}}
 
-      <label class="input-label" for="password" {{if .Form}}autofocus{{end}}>Password:</label>
+      <label class="input-label" for="password" {{if .Form}}autofocus{{end}}>{{translate .Lang "password"}}:</label>
       <input class="{{if .FieldErrors.Password}}invalid-field{{end}}" id="password" type="password" name="password" required>
       {{with .FieldErrors.Password}}<label class="error-label" for="password">{{.}}</label>{{end}}
 
-      <label class="input-label" for="repeatPassword">Repeat password:</label>
+      <label class="input-label" for="repeatPassword">{{translate .Lang "repeatPassword"}}:</label>
       <input class="{{if .FieldErrors.RepeatPassword}}invalid-field{{end}}" id="repeatPassword" type="password" name="repeatPassword" required>
       {{with .FieldErrors.RepeatPassword}}<label class="error-label" for="repeatPassword">{{.}}</label>{{end}}
 
@@ -38,10 +38,10 @@
       {{with .FieldErrors.Captcha}}<label class="error-label">{{.}}</label>{{end}}
       {{end}}
 
-      <a class="input-label" href="/user/login?redirect={{.Data.LoginRedirect}}">Sign in instead</a>
+      <a class="input-label" href="/user/login?redirect={{.Data.LoginRedirect}}">{{translate .Lang "signInInstead"}}</a>
     </div>
     <div class="submit-div">
-      <input class="btn" type="submit" value="Sign up">
+      <input class="btn" type="submit" value="{{translate .Lang "signup"}}">
     </div>
   </form>
 </div>

@@ -11,6 +11,7 @@ import (
 	"io"
 	"math"
 	"math/big"
+	"net/http"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -37,7 +38,7 @@ type AuthService interface {
 	AuthenticatedUserID(ctx context.Context) string
 	AuthorizedScopes(ctx context.Context) []string
 	IsEmailConfirmed(ctx context.Context, id string) (bool, error)
-	SendConfirmEmail(ctx context.Context, user *repos.UserModel) error
+	SendConfirmEmail(r *http.Request, ctx context.Context, user *repos.UserModel) error
 	ConfirmEmail(ctx context.Context, userID, code string) error
 
 	StartOAuthCodeFlow(ctx context.Context, clientID, redirectURI, responseType, scope, state, nonce string) error
@@ -287,14 +288,15 @@ func (a *authService) RevokeOAuthTokens(ctx context.Context, clientID, userID st
 	return nil
 }
 
-func (a *authService) SendConfirmEmail(ctx context.Context, user *repos.UserModel) error {
+func (a *authService) SendConfirmEmail(r *http.Request, ctx context.Context, user *repos.UserModel) error {
 	if token, err := a.tokenRepo.Find(ctx, repos.TokenConfirmEmail, user.ID); err == nil && time.Since(time.Unix(token.CreatedAt, 0)) < 2*time.Minute {
 		return ErrTimeout
 	} else if err != nil && !errors.Is(err, repos.ErrNoRecord) {
 		return fmt.Errorf("check confirm email timeout: %w", err)
 	}
 
-	data := newEmailTemplateData(user.Name)
+	lang := GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
+	data := newEmailTemplateData(user.Name, lang)
 	data.Code = generateCode(6)
 
 	_, err := a.tokenRepo.Create(ctx, repos.TokenConfirmEmail, user.ID, hashToken(data.Code), 2*time.Minute)

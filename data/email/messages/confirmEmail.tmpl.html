@@ -1,8 +1,8 @@
-{{define "title"}}Confirm Email{{end}}
+{{define "title"}}{{translate .Lang "confirmEmail"}}{{end}}
 
-{{define "smallPrint"}}You didn't create this account? TODO{{end}}
+{{define "smallPrint"}}{{translate .Lang "didntCreateAccount"}} TODO{{end}}
 
 {{define "content"}}
-You can confirm your email address using this code: {{.Code}}<br>
-You closed the form? Click <a href="{{.BaseURL}}/user/confirmEmail">here</a>.
+{{translate .Lang "confirmEmailWith"}}: {{.Code}}<br>
+{{translate .Lang "confirmEmailWith"}} {{translate .Lang "click"}} <a href="{{.BaseURL}}/user/confirmEmail">{{translate .Lang "here"}}</a>.
 {{end}}

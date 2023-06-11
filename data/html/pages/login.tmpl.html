@@ -1,8 +1,8 @@
-{{define "title"}}Login{{end}}
+{{define "title"}}{{translate .Lang "login"}}{{end}}
 
 {{define "main"}}
 <div class="form-panel">
-  <h2 class="form-title">Login</h2>
+  <h2 class="form-title">{{translate .Lang "login"}}</h2>
   {{with .Errors}}
   <ul class="error-list">
     {{range .}}
@@ -14,18 +14,18 @@
     <div>
       <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 
-      <label class="input-label" for="email">Email:</label>
+      <label class="input-label" for="email">{{translate .Lang "email"}}:</label>
       <input class="{{if .FieldErrors.Email}}invalid-field{{end}}" id="email" type="email" name="email" {{with .Form}}value="{{.Email}}"{{end}} {{if not .Form.Email}}autofocus{{end}} required>
       {{with .FieldErrors.Email}}<label class="error-label" for="email">{{.}}</label>{{end}}
 
-      <label class="input-label" for="password">Password:</label>
+      <label class="input-label" for="password">{{translate .Lang "password"}}:</label>
       <input class="{{if .FieldErrors.Password}}invalid-field{{end}}" id="password" type="password" name="password" required {{if .Form.Email}}autofocus{{end}}>
       {{with .FieldErrors.Password}}<label class="error-label" for="password">{{.}}</label>{{end}}
 
-      <a class="input-label" href="/user/signup">Create account</a>
+      <a class="input-label" href="/user/signup">{{translate .Lang "createAccount"}}</a>
     </div>
     <div class="submit-div">
-      <input class="btn" type="submit" value="Login">
+      <input class="btn" type="submit" value="{{translate .Lang "login"}}">
     </div>
   </form>
 </div>

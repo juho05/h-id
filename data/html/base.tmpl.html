@@ -14,13 +14,13 @@
       </div>
       <nav>
         {{if not .UserID}}
-        <a class="nav-link" href="/user/login">Login</a>
-        <a class="nav-link" href="/user/signup">Sign up</a>
+        <a class="nav-link" href="/user/login">{{translate .Lang "login"}}</a>
+        <a class="nav-link" href="/user/signup">{{translate .Lang "signup"}}</a>
         {{else}}
         <form action="/user/logout" method="post">
           <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
           <a class="nav-link" href="/user/profile">Account</a>
-          <button class="nav-link">Logout</button>
+          <button class="nav-link">{{translate .Lang "logout"}}</button>
         </form>
         {{end}}
       </nav>

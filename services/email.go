@@ -25,11 +25,13 @@ type emailTemplateData struct {
 	Name    string
 	Code    string
 	BaseURL string
+	Lang    string
 }
 
-func newEmailTemplateData(name string) emailTemplateData {
+func newEmailTemplateData(name, lang string) emailTemplateData {
 	return emailTemplateData{
 		Name:    name,
+		Lang:    lang,
 		BaseURL: config.BaseURL(),
 	}
 }
@@ -53,7 +55,9 @@ func (e *emailService) loadTemplates(emailFS fs.FS) error {
 	for _, msg := range messages {
 		name := strings.TrimSuffix(filepath.Base(msg), ".tmpl.html")
 
-		t, err := template.New(name).ParseFS(emailFS, "base.tmpl.html")
+		t, err := template.New(name).Funcs(template.FuncMap{
+			"translate": Translate,
+		}).ParseFS(emailFS, "base.tmpl.html")
 		if err != nil {
 			return fmt.Errorf("email: parse base.tmpl.html: %w", err)
 		}

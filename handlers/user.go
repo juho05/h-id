@@ -46,7 +46,7 @@ func (h *Handler) userSignUpPage(w http.ResponseWriter, r *http.Request) {
 	if config.HCaptchaSiteKey() != "" {
 		w.Header().Set("Cross-Origin-Embedder-Policy", "unsafe-none")
 	}
-	h.Renderer.render(w, http.StatusOK, "signup", h.newTemplateDataWithData(r, data))
+	h.Renderer.render(w, r, http.StatusOK, "signup", h.newTemplateDataWithData(r, data))
 }
 
 // POST /user/signup
@@ -76,7 +76,7 @@ func (h *Handler) userSignUp(w http.ResponseWriter, r *http.Request) {
 			if config.HCaptchaSiteKey() != "" {
 				w.Header().Set("Cross-Origin-Embedder-Policy", "unsafe-none")
 			}
-			h.Renderer.render(w, http.StatusUnprocessableEntity, "signup", data)
+			h.Renderer.render(w, r, http.StatusUnprocessableEntity, "signup", data)
 		} else {
 			serverError(w, err)
 		}
@@ -112,7 +112,7 @@ func (h *Handler) userLoginPage(w http.ResponseWriter, r *http.Request) {
 	data.Form = form{
 		Email: h.SessionManager.PopString(r.Context(), "email"),
 	}
-	h.Renderer.render(w, http.StatusOK, "login", data)
+	h.Renderer.render(w, r, http.StatusOK, "login", data)
 }
 
 // POST /user/login
@@ -126,13 +126,16 @@ func (h *Handler) userLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
+
 	err := h.AuthService.Login(r.Context(), body.Email, body.Password)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidCredentials) {
 			data := h.newTemplateData(r)
-			data.Errors = []string{"Invalid credentials."}
+			e, _ := services.Translate(lang, "invalidCredentials")
+			data.Errors = []string{e}
 			data.Form = body
-			h.Renderer.render(w, http.StatusUnauthorized, "login", data)
+			h.Renderer.render(w, r, http.StatusUnauthorized, "login", data)
 		} else {
 			serverError(w, err)
 		}
@@ -185,13 +188,13 @@ func (h *Handler) userConfirmEmailPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.AuthService.SendConfirmEmail(r.Context(), user)
+	err := h.AuthService.SendConfirmEmail(r, r.Context(), user)
 	if err != nil && !errors.Is(err, services.ErrTimeout) {
 		serverError(w, err)
 		return
 	}
 
-	h.Renderer.render(w, http.StatusOK, "confirmEmail", h.newTemplateData(r))
+	h.Renderer.render(w, r, http.StatusOK, "confirmEmail", h.newTemplateData(r))
 }
 
 // POST /user/confirmEmail
@@ -210,13 +213,15 @@ func (h *Handler) userConfirmEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
 	err := h.AuthService.ConfirmEmail(r.Context(), userID, body.Code)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidCredentials) {
 			data := h.newTemplateData(r)
-			data.Errors = []string{"Invalid credentials."}
+			e, _ := services.Translate(lang, "invalidCredentials")
+			data.Errors = []string{e}
 			data.Form = body
-			h.Renderer.render(w, http.StatusUnauthorized, "confirmEmail", data)
+			h.Renderer.render(w, r, http.StatusUnauthorized, "confirmEmail", data)
 		} else {
 			serverError(w, err)
 		}
@@ -278,7 +283,7 @@ func (h *Handler) userProfile(w http.ResponseWriter, r *http.Request) {
 		Name  string
 		Email string
 	}
-	h.Renderer.render(w, http.StatusOK, "profile", h.newTemplateDataWithData(r, userDTO{
+	h.Renderer.render(w, r, http.StatusOK, "profile", h.newTemplateDataWithData(r, userDTO{
 		ID:    user.ID,
 		Name:  user.Name,
 		Email: user.Email,
@@ -320,14 +325,14 @@ func (h *Handler) updateUserProfile(w http.ResponseWriter, r *http.Request) {
 	if pictureFile, pictureHeader, err := r.FormFile("profile_picture"); err == nil {
 		if pictureHeader.Size > 10<<20 { // 10 MB
 			tmplData.FieldErrors["ProfilePicture"] = "Profile picture size must not exceed 10 MB"
-			h.Renderer.render(w, http.StatusUnprocessableEntity, "profile", tmplData)
+			h.Renderer.render(w, r, http.StatusUnprocessableEntity, "profile", tmplData)
 			return
 		}
 
 		mimeType, _, err := mime.ParseMediaType(pictureHeader.Header.Get("Content-Type"))
 		if err != nil || (mimeType != "image/jpeg" && mimeType != "image/png" && mimeType != "image/gif") {
 			tmplData.FieldErrors["ProfilePicture"] = "Profile picture must be in JPEG, PNG or GIF format"
-			h.Renderer.render(w, http.StatusUnprocessableEntity, "profile", tmplData)
+			h.Renderer.render(w, r, http.StatusUnprocessableEntity, "profile", tmplData)
 			return
 		}
 
