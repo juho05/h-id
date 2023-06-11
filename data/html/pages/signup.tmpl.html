@@ -32,7 +32,8 @@
       {{with .FieldErrors.RepeatPassword}}<label class="error-label" for="repeatPassword">{{.}}</label>{{end}}
 
       {{if .SiteKey}}
-      <div class="h-captcha" data-sitekey="{{.SiteKey}}" data-theme="dark"></div>
+      <div id="h-captcha" class="h-captcha" data-sitekey="{{.SiteKey}}"></div>
+      <script src="/static/js/captcha.js"></script>
       <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
       {{with .FieldErrors.Captcha}}<label class="error-label">{{.}}</label>{{end}}
       {{end}}

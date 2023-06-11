@@ -1,6 +1,8 @@
 OUT_DIR=bin
 BIN_NAME=h-id
 
+.PHONY: build run watch migrate-up migrate-down sql-migrate clean
+
 build:
 	CGO_ENABLED=0 go build -o ${OUT_DIR}/${BIN_NAME} ./cmd/web
 
