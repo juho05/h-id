@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -122,11 +123,12 @@ func (h *Handler) oauthConsentPage(w http.ResponseWriter, r *http.Request) {
 		ClientWebsite     string
 		Scopes            []string
 	}
+	lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
 	h.Renderer.render(w, r, http.StatusOK, "oauthConsent", h.newTemplateDataWithData(r, tmplData{
 		ClientName:        client.Name,
 		ClientDescription: client.Description,
 		ClientWebsite:     client.Website,
-		Scopes:            h.AuthService.DescribeScopes(authRequest.Scopes),
+		Scopes:            h.AuthService.DescribeScopes(lang, authRequest.Scopes),
 	}))
 }
 

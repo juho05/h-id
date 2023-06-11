@@ -50,7 +50,7 @@ type AuthService interface {
 
 	VerifyAccessToken(ctx context.Context, token string, requiredScopes []string) (userID string, scopes []string, err error)
 
-	DescribeScopes(scopes []string) []string
+	DescribeScopes(lang string, scopes []string) []string
 }
 
 type (
@@ -478,16 +478,18 @@ func hashTokenWeak(token string) []byte {
 	return pbkdf2.Key([]byte(token), []byte("salt"), 5000, 256, sha256.New)
 }
 
-func (a *authService) DescribeScopes(scopes []string) []string {
+func (a *authService) DescribeScopes(lang string, scopes []string) []string {
 	descriptions := make([]string, 0, len(scopes))
 	for _, s := range scopes {
 		// [...] requests permission to:
 		switch s {
 		case "openid":
 		case "profile":
-			descriptions = append(descriptions, "View user and account information")
+			d, _ := Translate(lang, "scopesProfile")
+			descriptions = append(descriptions, d)
 		case "email":
-			descriptions = append(descriptions, "View your email address")
+			d, _ := Translate(lang, "scopesEmail")
+			descriptions = append(descriptions, d)
 		default:
 			descriptions = append(descriptions, s)
 		}

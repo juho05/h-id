@@ -40,6 +40,8 @@ var translations = map[string]map[string]string{
 		"here":                 "here",
 		"didntCreateAccount":   "You didn't create this account?",
 		"invalidCredentials":   "Invalid credentials",
+		"scopesProfile":        "View user and account information",
+		"scopesEmail":          "View your email address",
 	},
 	"de": {
 		"login":                "Anmelden",
@@ -69,6 +71,8 @@ var translations = map[string]map[string]string{
 		"signInInstead":        "Stattdessen anmelden",
 		"dear":                 "Hallo",
 		"invalidCredentials":   "Ungültige Zugangsdaten",
+		"scopesProfile":        "Profil und Account Informationen ansehen",
+		"scopesEmail":          "Email Adresse ansehen",
 	},
 }
 
