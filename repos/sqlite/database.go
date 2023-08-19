@@ -5,13 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
 	"net/http"
 	"net/url"
 
 	migrate "github.com/rubenv/sql-migrate"
 	"modernc.org/sqlite"
-	_ "modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 
 	"github.com/Bananenpro/log"
@@ -28,12 +26,8 @@ type DB struct {
 }
 
 func autoMigrate(db *sql.DB) error {
-	fs, err := fs.Sub(hid.MigrationsFS, "sqlite")
-	if err != nil {
-		return err
-	}
 	migrations := &migrate.HttpFileSystemMigrationSource{
-		FileSystem: http.FS(fs),
+		FileSystem: http.FS(hid.SQLiteMigrationsFS),
 	}
 	log.Trace("Migrating database...")
 	n, err := migrate.Exec(db, "sqlite3", migrations, migrate.Up)
