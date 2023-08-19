@@ -1,23 +1,28 @@
 package repos
 
-import "context"
+import (
+	"context"
+	"net/url"
+
+	"github.com/oklog/ulid/v2"
+)
 
 type ClientModel struct {
 	BaseModel
-	Name         string      `db:"name"`
-	Description  string      `db:"description"`
-	Website      string      `db:"website"`
-	RedirectURIs StringSlice `db:"redirect_uris"`
-	SecretHash   []byte      `db:"secret_hash"`
-	UserID       string      `db:"user_id"`
+	Name         string
+	Description  string
+	Website      *url.URL
+	RedirectURIs []*url.URL
+	SecretHash   []byte
+	UserID       ulid.ULID
 }
 
 type ClientRepository interface {
-	Find(ctx context.Context, id string) (*ClientModel, error)
-	FindByUserAndID(ctx context.Context, userID, id string) (*ClientModel, error)
-	FindByUser(ctx context.Context, userID string) ([]*ClientModel, error)
-	Create(ctx context.Context, userID, name, description, website string, redirectURIs []string, secretHash []byte) (*ClientModel, error)
-	Update(ctx context.Context, userID, id, name, description, website string, redirectURIs []string) error
-	UpdateSecret(ctx context.Context, userID, id string, newSecretHash []byte) error
-	Delete(ctx context.Context, userID, id string) error
+	Find(ctx context.Context, id ulid.ULID) (*ClientModel, error)
+	FindByUserAndID(ctx context.Context, userID, id ulid.ULID) (*ClientModel, error)
+	FindByUser(ctx context.Context, userID ulid.ULID) ([]*ClientModel, error)
+	Create(ctx context.Context, userID ulid.ULID, name, description string, website *url.URL, redirectURIs []*url.URL, secretHash []byte) (*ClientModel, error)
+	Update(ctx context.Context, userID, id ulid.ULID, name, description string, website *url.URL, redirectURIs []*url.URL) (*ClientModel, error)
+	UpdateSecret(ctx context.Context, userID, id ulid.ULID, newSecretHash []byte) error
+	Delete(ctx context.Context, userID, id ulid.ULID) error
 }

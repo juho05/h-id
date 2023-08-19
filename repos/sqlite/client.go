@@ -4,15 +4,17 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
+	"net/url"
+	"time"
 
-	"github.com/jmoiron/sqlx"
+	"github.com/oklog/ulid/v2"
 
 	"github.com/juho05/h-id/repos"
+	"github.com/juho05/h-id/repos/sqlite/db"
 )
 
 type clientRepository struct {
-	db *sqlx.DB
+	db *db.Queries
 }
 
 func (d *DB) NewClientRepository() repos.ClientRepository {
@@ -21,88 +23,132 @@ func (d *DB) NewClientRepository() repos.ClientRepository {
 	}
 }
 
-func (c *clientRepository) Find(ctx context.Context, id string) (*repos.ClientModel, error) {
-	var client repos.ClientModel
-	err := c.db.GetContext(ctx, &client, "SELECT * FROM clients WHERE id = ?", id)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			err = repos.ErrNoRecord
+func repoClients(clients []db.Client) ([]*repos.ClientModel, error) {
+	repoClients := make([]*repos.ClientModel, len(clients))
+	for i, client := range clients {
+		c, err := repoClient(client)
+		if err != nil {
+			return nil, err
 		}
-		return nil, fmt.Errorf("find client: %w", err)
+		repoClients[i] = c
 	}
-	return &client, nil
+	return repoClients, nil
 }
 
-func (c *clientRepository) FindByUserAndID(ctx context.Context, userID, id string) (*repos.ClientModel, error) {
-	var client repos.ClientModel
-	err := c.db.GetContext(ctx, &client, "SELECT * FROM clients WHERE user_id = ? AND id = ?", userID, id)
+func repoClient(client db.Client) (*repos.ClientModel, error) {
+	id, err := ulid.Parse(client.ID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			err = repos.ErrNoRecord
-		}
-		return nil, fmt.Errorf("find client by user and id: %w", err)
+		return nil, err
 	}
-	return &client, nil
+	userID, err := ulid.Parse(client.UserID)
+	if err != nil {
+		return nil, err
+	}
+	website, err := url.Parse(client.Website)
+	if err != nil {
+		return nil, err
+	}
+	redirectURLs, err := urlsFromJSON(client.RedirectUris)
+	if err != nil {
+		return nil, err
+	}
+	return &repos.ClientModel{
+		BaseModel: repos.BaseModel{
+			ID:        id,
+			CreatedAt: time.Unix(client.CreatedAt, 0),
+		},
+		Name:         client.Name,
+		Description:  client.Description,
+		Website:      website,
+		RedirectURIs: redirectURLs,
+		SecretHash:   client.SecretHash,
+		UserID:       userID,
+	}, nil
 }
 
-func (c *clientRepository) FindByUser(ctx context.Context, userID string) ([]*repos.ClientModel, error) {
-	var clients []*repos.ClientModel
-	err := c.db.SelectContext(ctx, &clients, "SELECT * FROM clients WHERE user_id = ?", userID)
+func (c *clientRepository) Find(ctx context.Context, id ulid.ULID) (*repos.ClientModel, error) {
+	client, err := c.db.FindClient(ctx, id.String())
+	if err != nil {
+		return nil, repoErr("find client: %w", err)
+	}
+	return repoClient(client)
+}
+
+func (c *clientRepository) FindByUserAndID(ctx context.Context, userID, id ulid.ULID) (*repos.ClientModel, error) {
+	client, err := c.db.FindClientByUserAndID(ctx, db.FindClientByUserAndIDParams{
+		ID:     id.String(),
+		UserID: userID.String(),
+	})
+	if err != nil {
+		return nil, repoErr("find client by user and ID: %w", err)
+	}
+	return repoClient(client)
+}
+
+func (c *clientRepository) FindByUser(ctx context.Context, userID ulid.ULID) ([]*repos.ClientModel, error) {
+	clients, err := c.db.FindClientByUser(ctx, userID.String())
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return make([]*repos.ClientModel, 0), nil
 		}
-		return nil, fmt.Errorf("find client: %w", err)
+		return nil, repoErr("find client by user: %w", err)
 	}
-	return clients, nil
+	return repoClients(clients)
 }
 
-func (c *clientRepository) Create(ctx context.Context, userID, name, description, website string, redirectURIs []string, secretHash []byte) (*repos.ClientModel, error) {
-	client := &repos.ClientModel{
-		BaseModel:    newBase(),
+func (c *clientRepository) Create(ctx context.Context, userID ulid.ULID, name, description string, website *url.URL, redirectURIs []*url.URL, secretHash []byte) (*repos.ClientModel, error) {
+	redirectURIsJSON, err := urlsToJSON(redirectURIs)
+	if err != nil {
+		return nil, err
+	}
+	client, err := c.db.CreateClient(ctx, db.CreateClientParams{
+		ID:           ulid.Make().String(),
+		CreatedAt:    time.Now().Unix(),
 		Name:         name,
 		Description:  description,
-		Website:      website,
-		RedirectURIs: redirectURIs,
+		Website:      website.String(),
+		RedirectUris: redirectURIsJSON,
 		SecretHash:   secretHash,
-		UserID:       userID,
-	}
-	_, err := c.db.ExecContext(ctx, "INSERT INTO clients (id, created_at, name, description, website, redirect_uris, secret_hash, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", client.ID, client.CreatedAt, client.Name, client.Description, client.Website, client.RedirectURIs, client.SecretHash, client.UserID)
+		UserID:       userID.String(),
+	})
 	if err != nil {
-		return nil, fmt.Errorf("create client: %w", err)
+		return nil, repoErr("create client: %w", err)
 	}
-	return client, nil
+	return repoClient(client)
 }
 
-func (c *clientRepository) Update(ctx context.Context, userID, id, name, description, website string, redirectURIs []string) error {
-	result, err := c.db.ExecContext(ctx, "UPDATE clients SET name = ?, description = ?, website = ?, redirect_uris = ? WHERE user_id = ? AND id = ?", name, description, website, redirectURIs, userID, id)
+func (c *clientRepository) Update(ctx context.Context, userID, id ulid.ULID, name, description string, website *url.URL, redirectURIs []*url.URL) (*repos.ClientModel, error) {
+	redirectURIsJSON, err := urlsToJSON(redirectURIs)
 	if err != nil {
-		return fmt.Errorf("update client: %w", err)
+		return nil, err
 	}
-	if rows, err := result.RowsAffected(); err == nil && rows == 0 {
-		return fmt.Errorf("update client: %w", repos.ErrNoRecord)
+	client, err := c.db.UpdateClient(ctx, db.UpdateClientParams{
+		UserID:       userID.String(),
+		ID:           id.String(),
+		Name:         name,
+		Description:  description,
+		Website:      website.String(),
+		RedirectUris: redirectURIsJSON,
+	})
+	if err != nil {
+		return nil, repoErr("update client: %w", err)
 	}
-	return nil
+	return repoClient(client)
 }
 
-func (c *clientRepository) UpdateSecret(ctx context.Context, userID, id string, newSecretHash []byte) error {
-	result, err := c.db.ExecContext(ctx, "UPDATE clients SET secret_hash = ? WHERE user_id = ? AND id = ?", newSecretHash, userID, id)
-	if err != nil {
-		return fmt.Errorf("update client secret: %w", err)
-	}
-	if rows, err := result.RowsAffected(); err == nil && rows == 0 {
-		return fmt.Errorf("update client secret: %w", repos.ErrNoRecord)
-	}
-	return nil
+func (c *clientRepository) UpdateSecret(ctx context.Context, userID, id ulid.ULID, newSecretHash []byte) error {
+	result, err := c.db.UpdateClientSecret(ctx, db.UpdateClientSecretParams{
+		UserID:     userID.String(),
+		ID:         id.String(),
+		SecretHash: newSecretHash,
+	})
+	return repoErrResult("update client secret: %w", result, err)
 }
 
-func (c *clientRepository) Delete(ctx context.Context, userID, id string) error {
-	result, err := c.db.ExecContext(ctx, "DELETE FROM clients WHERE user_id = ? AND id = ?", userID, id)
-	if err != nil {
-		return fmt.Errorf("delete client: %w", err)
-	}
-	if rows, err := result.RowsAffected(); err == nil && rows == 0 {
-		return fmt.Errorf("delete client: %w", repos.ErrNoRecord)
-	}
-	return nil
+func (c *clientRepository) Delete(ctx context.Context, userID, id ulid.ULID) error {
+	result, err := c.db.DeleteClient(ctx, db.DeleteClientParams{
+		UserID: userID.String(),
+		ID:     id.String(),
+	})
+	return repoErrResult("delete client: %w", result, err)
 }

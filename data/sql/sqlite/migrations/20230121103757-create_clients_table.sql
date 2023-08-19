@@ -5,7 +5,7 @@ CREATE TABLE clients (
 	name TEXT NOT NULL,
 	description TEXT NOT NULL,
 	website TEXT NOT NULL,
-	redirect_uris TEXT NOT NULL,
+	redirect_uris BLOB NOT NULL,
 	secret_hash BLOB NOT NULL,
 	user_id TEXT NOT NULL,
 	FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE

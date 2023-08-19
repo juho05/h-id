@@ -5,13 +5,13 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"math/big"
 	"net/http"
 	"net/url"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/oklog/ulid/v2"
 
 	"github.com/juho05/h-id/repos"
 	"github.com/juho05/h-id/services"
@@ -28,20 +28,26 @@ func (h *Handler) oauthRoutes(r chi.Router) {
 }
 
 func (h *Handler) oauthAuth(w http.ResponseWriter, r *http.Request) {
-	clientID := r.URL.Query().Get("client_id")
-	redirectURI := r.URL.Query().Get("redirect_uri")
+	clientIDStr := r.URL.Query().Get("client_id")
+	redirectURIStr := r.URL.Query().Get("redirect_uri")
 	scope := r.URL.Query().Get("scope")
 	responseType := r.URL.Query().Get("response_type")
 	state := r.URL.Query().Get("state")
 	nonce := r.URL.Query().Get("nonce")
 
-	if clientID == "" || redirectURI == "" || responseType == "" {
+	clientID, err := ulid.Parse(clientIDStr)
+	if err != nil {
 		clientError(w, http.StatusBadRequest)
 		return
 	}
 
-	redirect, err := url.Parse(redirectURI)
+	redirectURI, err := url.Parse(redirectURIStr)
 	if err != nil {
+		clientError(w, http.StatusBadRequest)
+		return
+	}
+
+	if responseType == "" {
 		clientError(w, http.StatusBadRequest)
 		return
 	}
@@ -53,21 +59,21 @@ func (h *Handler) oauthAuth(w http.ResponseWriter, r *http.Request) {
 		} else if errors.Is(err, services.ErrInvalidRedirectURI) {
 			clientError(w, http.StatusBadRequest)
 		} else if errors.Is(err, services.ErrUnsupportedResponseType) {
-			q := redirect.Query()
+			q := redirectURI.Query()
 			q.Add("error", "unsupported_response_type")
 			if state != "" {
 				q.Add("state", state)
 			}
-			redirect.RawQuery = q.Encode()
-			http.Redirect(w, r, redirect.String(), http.StatusSeeOther)
+			redirectURI.RawQuery = q.Encode()
+			http.Redirect(w, r, redirectURI.String(), http.StatusSeeOther)
 		} else if errors.Is(err, services.ErrInvalidScope) {
-			q := redirect.Query()
+			q := redirectURI.Query()
 			q.Add("error", "invalid_scope")
 			if state != "" {
 				q.Add("state", state)
 			}
-			redirect.RawQuery = q.Encode()
-			http.Redirect(w, r, redirect.String(), http.StatusSeeOther)
+			redirectURI.RawQuery = q.Encode()
+			http.Redirect(w, r, redirectURI.String(), http.StatusSeeOther)
 		} else {
 			serverError(w, err)
 		}
@@ -94,19 +100,13 @@ func (h *Handler) oauthConsentPage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		redirect, err := url.Parse(authRequest.RedirectURI)
-		if err != nil {
-			serverError(w, fmt.Errorf("oauth consent page handler: %w", err))
-			return
-		}
-
-		q := redirect.Query()
+		q := authRequest.RedirectURI.Query()
 		q.Add("code", code)
 		if authRequest.State != "" {
 			q.Add("state", authRequest.State)
 		}
-		redirect.RawQuery = q.Encode()
-		http.Redirect(w, r, redirect.String(), http.StatusSeeOther)
+		authRequest.RedirectURI.RawQuery = q.Encode()
+		http.Redirect(w, r, authRequest.RedirectURI.String(), http.StatusSeeOther)
 		return
 	}
 
@@ -126,7 +126,7 @@ func (h *Handler) oauthConsentPage(w http.ResponseWriter, r *http.Request) {
 	h.Renderer.render(w, r, http.StatusOK, "oauthConsent", h.newTemplateDataWithData(r, tmplData{
 		ClientName:        client.Name,
 		ClientDescription: client.Description,
-		ClientWebsite:     client.Website,
+		ClientWebsite:     client.Website.String(),
 		Scopes:            h.AuthService.DescribeScopes(lang, authRequest.Scopes),
 	}))
 }
@@ -149,20 +149,15 @@ func (h *Handler) oauthConsent(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	redirect, err := url.Parse(req.RedirectURI)
-	if err != nil {
-		serverError(w, fmt.Errorf("oauth consent handler: %w", err))
-		return
-	}
 
 	if data.Choice != "accept" {
-		q := redirect.Query()
+		q := req.RedirectURI.Query()
 		q.Add("error", "access_denied")
 		if req.State != "" {
 			q.Add("state", req.State)
 		}
-		redirect.RawQuery = q.Encode()
-		http.Redirect(w, r, redirect.String(), http.StatusSeeOther)
+		req.RedirectURI.RawQuery = q.Encode()
+		http.Redirect(w, r, req.RedirectURI.String(), http.StatusSeeOther)
 		return
 	}
 
@@ -172,13 +167,13 @@ func (h *Handler) oauthConsent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	q := redirect.Query()
+	q := req.RedirectURI.Query()
 	q.Add("code", code)
 	if req.State != "" {
 		q.Add("state", req.State)
 	}
-	redirect.RawQuery = q.Encode()
-	http.Redirect(w, r, redirect.String(), http.StatusSeeOther)
+	req.RedirectURI.RawQuery = q.Encode()
+	http.Redirect(w, r, req.RedirectURI.String(), http.StatusSeeOther)
 }
 
 func (h *Handler) oauthToken(w http.ResponseWriter, r *http.Request) {
@@ -187,7 +182,7 @@ func (h *Handler) oauthToken(w http.ResponseWriter, r *http.Request) {
 	type request struct {
 		GrantType    string `form:"grant_type"`
 		Code         string `form:"code"`
-		RedirectURI  string `form:"redirect_uri"`
+		RedirectURI  URL    `form:"redirect_uri"`
 		RefreshToken string `form:"refresh_token"`
 	}
 
@@ -203,7 +198,12 @@ func (h *Handler) oauthToken(w http.ResponseWriter, r *http.Request) {
 		respondJSONError(w, errors.New("invalid_client"), http.StatusUnauthorized)
 		return
 	}
-	clientID, err := url.QueryUnescape(username)
+	clientIDStr, err := url.QueryUnescape(username)
+	if err != nil {
+		respondJSONError(w, errors.New("invalid_request"), http.StatusBadRequest)
+		return
+	}
+	clientID, err := ulid.Parse(clientIDStr)
 	if err != nil {
 		respondJSONError(w, errors.New("invalid_request"), http.StatusBadRequest)
 		return
@@ -222,7 +222,7 @@ func (h *Handler) oauthToken(w http.ResponseWriter, r *http.Request) {
 		grant = data.RefreshToken
 	}
 
-	access, refresh, id, err := h.AuthService.OAuthGenerateTokens(r.Context(), clientID, clientSecret, data.RedirectURI, data.GrantType, grant)
+	access, refresh, id, err := h.AuthService.OAuthGenerateTokens(r.Context(), clientID, clientSecret, data.RedirectURI.URL, data.GrantType, grant)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidCredentials) {
 			w.Header().Set("WWW-Authenticate", "Basic realm=\"client authentication\"")

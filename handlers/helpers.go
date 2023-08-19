@@ -303,3 +303,28 @@ func matchETagHeader(current, header string, weak bool) bool {
 	}
 	return false
 }
+
+type URL struct {
+	URL *url.URL
+}
+
+func (u URL) MarshalText() ([]byte, error) {
+	return []byte(u.URL.String()), nil
+}
+
+func (u *URL) UnmarshalText(text []byte) error {
+	uri, err := url.Parse(string(text))
+	if err != nil {
+		return errors.New("invalid URL")
+	}
+	u.URL = uri
+	return nil
+}
+
+func urlsToStdURLs(urls []URL) []*url.URL {
+	std := make([]*url.URL, len(urls))
+	for i, u := range urls {
+		std[i] = u.URL
+	}
+	return std
+}

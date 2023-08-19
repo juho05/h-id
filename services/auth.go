@@ -13,6 +13,7 @@ import (
 	"math"
 	"math/big"
 	"net/http"
+	"net/url"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -22,6 +23,7 @@ import (
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/oklog/ulid/v2"
 	"github.com/xdg-go/pbkdf2"
 
 	"github.com/Bananenpro/log"
@@ -37,21 +39,21 @@ type AuthService interface {
 	Logout(ctx context.Context) error
 	HashPassword(password string) ([]byte, error)
 	VerifyPassword(user *repos.UserModel, password string) error
-	VerifyPasswordByID(ctx context.Context, id, password string) error
-	AuthenticatedUserID(ctx context.Context) string
+	VerifyPasswordByID(ctx context.Context, id ulid.ULID, password string) error
+	AuthenticatedUserID(ctx context.Context) ulid.ULID
 	AuthorizedScopes(ctx context.Context) []string
-	IsEmailConfirmed(ctx context.Context, id string) (bool, error)
+	IsEmailConfirmed(ctx context.Context, id ulid.ULID) (bool, error)
 	SendConfirmEmail(r *http.Request, ctx context.Context, user *repos.UserModel) error
-	ConfirmEmail(ctx context.Context, userID, code string) error
+	ConfirmEmail(ctx context.Context, userID ulid.ULID, code string) error
 
-	StartOAuthCodeFlow(ctx context.Context, clientID, redirectURI, responseType, scope, state, nonce string) error
+	StartOAuthCodeFlow(ctx context.Context, clientID ulid.ULID, redirectURI *url.URL, responseType, scope, state, nonce string) error
 	GetAuthRequest(ctx context.Context) (AuthRequest, error)
 	OAuthConsent(ctx context.Context) (string, error)
-	OAuthGenerateTokens(ctx context.Context, clientID, clientSecret, redirectURI, grantType, grant string) (access string, refresh string, id string, err error)
-	VerifyClientCredentials(ctx context.Context, clientID, clientSecret string) error
-	RevokeOAuthTokens(ctx context.Context, clientID, userID string) error
+	OAuthGenerateTokens(ctx context.Context, clientID ulid.ULID, clientSecret string, redirectURI *url.URL, grantType, grant string) (access string, refresh string, id string, err error)
+	VerifyClientCredentials(ctx context.Context, clientID ulid.ULID, clientSecret string) error
+	RevokeOAuthTokens(ctx context.Context, clientID, userID ulid.ULID) error
 
-	VerifyAccessToken(ctx context.Context, token string, requiredScopes []string) (userID string, scopes []string, err error)
+	VerifyAccessToken(ctx context.Context, token string, requiredScopes []string) (userID ulid.ULID, scopes []string, err error)
 
 	DescribeScopes(lang string, scopes []string) []string
 }
@@ -69,6 +71,7 @@ func init() {
 		log.Fatalf("crypto/rand is unavailable: Read() failed with %#v", err)
 	}
 
+	gob.Register(ulid.ULID{})
 	gob.Register(AuthRequest{})
 }
 
@@ -86,8 +89,8 @@ type authService struct {
 }
 
 type AuthRequest struct {
-	ClientID     string
-	RedirectURI  string
+	ClientID     ulid.ULID
+	RedirectURI  *url.URL
 	Scopes       []string
 	State        string
 	Nonce        string
@@ -138,7 +141,7 @@ func (a *authService) PublicJWTKey() *rsa.PublicKey {
 	return a.jwtKeyPub
 }
 
-func (a *authService) StartOAuthCodeFlow(ctx context.Context, clientID, redirectURI, responseType, scope, state, nonce string) error {
+func (a *authService) StartOAuthCodeFlow(ctx context.Context, clientID ulid.ULID, redirectURI *url.URL, responseType, scope, state, nonce string) error {
 	client, err := a.clientRepo.Find(ctx, clientID)
 	if err != nil {
 		return fmt.Errorf("start OAuth code flow: %w", err)
@@ -200,19 +203,20 @@ func (a *authService) OAuthConsent(ctx context.Context) (string, error) {
 	code := generateToken(64)
 	codeHash := hashTokenWeak(code)
 
-	_, err = a.oauthRepo.SetPermissions(ctx, req.ClientID, a.AuthenticatedUserID(ctx), req.Scopes)
+	userID := a.AuthenticatedUserID(ctx)
+	_, err = a.oauthRepo.SetPermissions(ctx, req.ClientID, userID, req.Scopes)
 	if err != nil {
 		return "", fmt.Errorf("OAuth consent: %w", err)
 	}
 
-	_, err = a.oauthRepo.Create(ctx, req.ClientID, a.AuthenticatedUserID(ctx), repos.OAuthTokenCode, codeHash, req.RedirectURI, req.Scopes, []byte(req.Nonce), 1*time.Minute)
+	_, err = a.oauthRepo.Create(ctx, req.ClientID, userID, repos.OAuthTokenCode, codeHash, req.RedirectURI, req.Scopes, []byte(req.Nonce), 1*time.Minute)
 	if err != nil {
 		return "", fmt.Errorf("OAuth consent: %w", err)
 	}
 	return code, nil
 }
 
-func (a *authService) OAuthGenerateTokens(ctx context.Context, clientID, clientSecret, redirectURI, grantType, grant string) (string, string, string, error) {
+func (a *authService) OAuthGenerateTokens(ctx context.Context, clientID ulid.ULID, clientSecret string, redirectURI *url.URL, grantType, grant string) (string, string, string, error) {
 	if err := a.VerifyClientCredentials(ctx, clientID, clientSecret); err != nil {
 		return "", "", "", fmt.Errorf("oauth generate tokens: %w", err)
 	}
@@ -248,7 +252,7 @@ func (a *authService) OAuthGenerateTokens(ctx context.Context, clientID, clientS
 		return "", "", "", ErrReusedToken
 	}
 
-	if grantType != "refresh_token" && token.RedirectURI != redirectURI {
+	if grantType != "refresh_token" && token.RedirectURI.String() != redirectURI.String() {
 		return "", "", "", fmt.Errorf("oauth generate tokens: %w", ErrInvalidRedirectURI)
 	}
 
@@ -262,12 +266,12 @@ func (a *authService) OAuthGenerateTokens(ctx context.Context, clientID, clientS
 	refresh := generateToken(128)
 	refreshHash := hashTokenWeak(refresh)
 
-	_, err = a.oauthRepo.Create(ctx, token.ClientID, token.UserID, repos.OAuthTokenAccess, accessHash, "", token.Scopes, nil, 30*time.Minute)
+	_, err = a.oauthRepo.Create(ctx, token.ClientID, token.UserID, repos.OAuthTokenAccess, accessHash, nil, token.Scopes, nil, 30*time.Minute)
 	if err != nil {
 		return "", "", "", fmt.Errorf("oauth tokens by code: %w", err)
 	}
 
-	_, err = a.oauthRepo.Create(ctx, token.ClientID, token.UserID, repos.OAuthTokenRefresh, refreshHash, "", token.Scopes, nil, 12*7*24*time.Hour)
+	_, err = a.oauthRepo.Create(ctx, token.ClientID, token.UserID, repos.OAuthTokenRefresh, refreshHash, nil, token.Scopes, nil, 12*7*24*time.Hour)
 	if err != nil {
 		return "", "", "", fmt.Errorf("oauth tokens by code: %w", err)
 	}
@@ -288,7 +292,7 @@ func (a *authService) OAuthGenerateTokens(ctx context.Context, clientID, clientS
 	return access, refresh, id, nil
 }
 
-func (a *authService) createIDToken(clientID, userID, nonce string) (string, error) {
+func (a *authService) createIDToken(clientID, userID ulid.ULID, nonce string) (string, error) {
 	type claims struct {
 		jwt.RegisteredClaims
 		Nonce string `json:"nonce,omitempty"`
@@ -296,8 +300,8 @@ func (a *authService) createIDToken(clientID, userID, nonce string) (string, err
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    config.BaseURL(),
-			Subject:   userID,
-			Audience:  jwt.ClaimStrings{clientID},
+			Subject:   userID.String(),
+			Audience:  jwt.ClaimStrings{clientID.String()},
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
@@ -306,7 +310,7 @@ func (a *authService) createIDToken(clientID, userID, nonce string) (string, err
 	return token.SignedString(a.jwtKeyPriv)
 }
 
-func (a *authService) VerifyClientCredentials(ctx context.Context, clientID, clientSecret string) error {
+func (a *authService) VerifyClientCredentials(ctx context.Context, clientID ulid.ULID, clientSecret string) error {
 	client, err := a.clientRepo.Find(ctx, clientID)
 	if err != nil {
 		if errors.Is(err, repos.ErrNoRecord) {
@@ -320,7 +324,7 @@ func (a *authService) VerifyClientCredentials(ctx context.Context, clientID, cli
 	return nil
 }
 
-func (a *authService) RevokeOAuthTokens(ctx context.Context, clientID, userID string) error {
+func (a *authService) RevokeOAuthTokens(ctx context.Context, clientID, userID ulid.ULID) error {
 	err := a.oauthRepo.DeleteByUser(ctx, clientID, userID)
 	if err != nil {
 		return fmt.Errorf("revoke OAuth tokens: %w", err)
@@ -329,7 +333,7 @@ func (a *authService) RevokeOAuthTokens(ctx context.Context, clientID, userID st
 }
 
 func (a *authService) SendConfirmEmail(r *http.Request, ctx context.Context, user *repos.UserModel) error {
-	if token, err := a.tokenRepo.Find(ctx, repos.TokenConfirmEmail, user.ID); err == nil && time.Since(time.Unix(token.CreatedAt, 0)) < 2*time.Minute {
+	if token, err := a.tokenRepo.Find(ctx, repos.TokenConfirmEmail, user.ID.String()); err == nil && time.Since(token.CreatedAt) < 2*time.Minute {
 		return ErrTimeout
 	} else if err != nil && !errors.Is(err, repos.ErrNoRecord) {
 		return fmt.Errorf("check confirm email timeout: %w", err)
@@ -339,7 +343,7 @@ func (a *authService) SendConfirmEmail(r *http.Request, ctx context.Context, use
 	data := newEmailTemplateData(user.Name, lang)
 	data.Code = generateCode(6)
 
-	_, err := a.tokenRepo.Create(ctx, repos.TokenConfirmEmail, user.ID, hashToken(data.Code), 2*time.Minute)
+	_, err := a.tokenRepo.Create(ctx, repos.TokenConfirmEmail, user.ID.String(), hashToken(data.Code), 2*time.Minute)
 	if err != nil {
 		return fmt.Errorf("create email confirmation token: %w", err)
 	}
@@ -353,8 +357,8 @@ func (a *authService) SendConfirmEmail(r *http.Request, ctx context.Context, use
 	return nil
 }
 
-func (a *authService) ConfirmEmail(ctx context.Context, userID, code string) error {
-	token, err := a.tokenRepo.Find(ctx, repos.TokenConfirmEmail, userID)
+func (a *authService) ConfirmEmail(ctx context.Context, userID ulid.ULID, code string) error {
+	token, err := a.tokenRepo.Find(ctx, repos.TokenConfirmEmail, userID.String())
 	if err != nil {
 		if errors.Is(err, repos.ErrNoRecord) {
 			return ErrInvalidCredentials
@@ -366,7 +370,7 @@ func (a *authService) ConfirmEmail(ctx context.Context, userID, code string) err
 		return ErrInvalidCredentials
 	}
 
-	err = a.tokenRepo.Delete(ctx, repos.TokenConfirmEmail, userID)
+	err = a.tokenRepo.Delete(ctx, repos.TokenConfirmEmail, userID.String())
 	if err != nil {
 		return fmt.Errorf("confirm email: %w", err)
 	}
@@ -385,10 +389,13 @@ func (a *authService) ConfirmEmail(ctx context.Context, userID, code string) err
 	return nil
 }
 
-func (a *authService) AuthenticatedUserID(ctx context.Context) string {
-	value, _ := ctx.Value(AuthUserIDCtxKey{}).(string)
-	if value == "" {
-		value = a.sessionManager.GetString(ctx, "authUserID")
+func (a *authService) AuthenticatedUserID(ctx context.Context) ulid.ULID {
+	value, ok := ctx.Value(AuthUserIDCtxKey{}).(ulid.ULID)
+	if !ok {
+		value, ok = a.sessionManager.Get(ctx, "authUserID").(ulid.ULID)
+		if !ok {
+			return ulid.ULID{}
+		}
 	}
 	return value
 }
@@ -398,7 +405,7 @@ func (a *authService) AuthorizedScopes(ctx context.Context) []string {
 	return value
 }
 
-func (a *authService) IsEmailConfirmed(ctx context.Context, id string) (bool, error) {
+func (a *authService) IsEmailConfirmed(ctx context.Context, id ulid.ULID) (bool, error) {
 	authUser := a.AuthenticatedUserID(ctx)
 	if id == authUser && a.sessionManager.Exists(ctx, "emailConfirmed") {
 		return a.sessionManager.GetBool(ctx, "emailConfirmed"), nil
@@ -457,7 +464,7 @@ func (a *authService) VerifyPassword(user *repos.UserModel, password string) err
 	return err
 }
 
-func (a *authService) VerifyPasswordByID(ctx context.Context, id, password string) error {
+func (a *authService) VerifyPasswordByID(ctx context.Context, id ulid.ULID, password string) error {
 	hash, err := a.userRepo.GetPasswordHash(ctx, id)
 	if err != nil {
 		return err
@@ -469,14 +476,14 @@ func (a *authService) VerifyPasswordByID(ctx context.Context, id, password strin
 	return err
 }
 
-func (a *authService) VerifyAccessToken(ctx context.Context, token string, requiredScopes []string) (string, []string, error) {
+func (a *authService) VerifyAccessToken(ctx context.Context, token string, requiredScopes []string) (ulid.ULID, []string, error) {
 	access, err := a.oauthRepo.Find(ctx, repos.OAuthTokenAccess, hashTokenWeak(token))
 	if err != nil {
-		return "", nil, fmt.Errorf("verify access token: %w", ErrInvalidCredentials)
+		return ulid.ULID{}, nil, fmt.Errorf("verify access token: %w", ErrInvalidCredentials)
 	}
 	for _, s := range requiredScopes {
 		if !slices.Contains(access.Scopes, s) {
-			return "", nil, ErrInsufficientScope
+			return ulid.ULID{}, nil, ErrInsufficientScope
 		}
 	}
 	return access.UserID, access.Scopes, nil

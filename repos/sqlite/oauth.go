@@ -2,18 +2,18 @@ package sqlite
 
 import (
 	"context"
-	"database/sql"
-	"errors"
-	"fmt"
+	"net/url"
+	"strings"
 	"time"
 
-	"github.com/jmoiron/sqlx"
+	"github.com/oklog/ulid/v2"
 
 	"github.com/juho05/h-id/repos"
+	"github.com/juho05/h-id/repos/sqlite/db"
 )
 
 type oauthRepository struct {
-	db *sqlx.DB
+	db *db.Queries
 }
 
 func (d *DB) NewOAuthRepository() repos.OAuthRepository {
@@ -22,113 +22,140 @@ func (d *DB) NewOAuthRepository() repos.OAuthRepository {
 	}
 }
 
-func (a *oauthRepository) Create(ctx context.Context, clientID, userID string, category repos.OAuthTokenCategory, tokenHash []byte, redirectURI string, scopes []string, data []byte, lifetime time.Duration) (*repos.OAuthTokenModel, error) {
-	token := &repos.OAuthTokenModel{
-		CreatedAt:   time.Now().Unix(),
-		Category:    category,
-		TokenHash:   tokenHash,
+func repoOAuthToken(token db.Oauth) (*repos.OAuthTokenModel, error) {
+	redirectURI, err := url.Parse(token.RedirectUri)
+	if err != nil {
+		return nil, err
+	}
+	clientID, err := ulid.Parse(token.ClientID)
+	if err != nil {
+		return nil, err
+	}
+	userID, err := ulid.Parse(token.UserID)
+	if err != nil {
+		return nil, err
+	}
+	return &repos.OAuthTokenModel{
+		CreatedAt:   time.Unix(token.CreatedAt, 0),
+		Category:    repos.OAuthTokenCategory(token.Category),
+		TokenHash:   token.TokenHash,
 		RedirectURI: redirectURI,
 		ClientID:    clientID,
 		UserID:      userID,
-		Scopes:      scopes,
+		Scopes:      strings.Split(token.Scopes, ","),
+		Data:        token.Data,
+		Expires:     time.Unix(token.Expires, 0),
+		Used:        token.Used,
+	}, nil
+}
+
+func repoOAuthPermissions(perms db.Permission) (*repos.PermissionsModel, error) {
+	userID, err := ulid.Parse(perms.UserID)
+	if err != nil {
+		return nil, err
+	}
+	clientID, err := ulid.Parse(perms.ClientID)
+	if err != nil {
+		return nil, err
+	}
+	return &repos.PermissionsModel{
+		CreatedAt: time.Unix(perms.CreatedAt, 0),
+		ClientID:  clientID,
+		UserID:    userID,
+		Scopes:    strings.Split(perms.Scopes, ","),
+	}, nil
+}
+
+func (a *oauthRepository) Create(ctx context.Context, clientID, userID ulid.ULID, category repos.OAuthTokenCategory, tokenHash []byte, redirectURI *url.URL, scopes []string, data []byte, lifetime time.Duration) (*repos.OAuthTokenModel, error) {
+	var redirectURIStr string
+	if redirectURI != nil {
+		redirectURIStr = redirectURI.String()
+	}
+	token, err := a.db.CreateOAuthToken(ctx, db.CreateOAuthTokenParams{
+		CreatedAt:   time.Now().Unix(),
+		Category:    string(category),
+		TokenHash:   tokenHash,
+		RedirectUri: redirectURIStr,
+		Scopes:      strings.Join(scopes, ","),
 		Data:        data,
+		ClientID:    clientID.String(),
+		UserID:      userID.String(),
 		Expires:     time.Now().Add(lifetime).Unix(),
 		Used:        false,
-	}
-	_, err := a.db.ExecContext(ctx, "INSERT INTO oauth (created_at, category, token_hash, redirect_uri, client_id, user_id, scopes, data, expires, used) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", token.CreatedAt, token.Category, token.TokenHash, token.RedirectURI, token.ClientID, token.UserID, token.Scopes, token.Data, token.Expires, token.Used)
+	})
 	if err != nil {
-		return nil, fmt.Errorf("create OAuth token: %w", err)
+		return nil, repoErr("create oauth token: %w", err)
 	}
-	return token, nil
+	return repoOAuthToken(token)
 }
 
 func (a *oauthRepository) Find(ctx context.Context, category repos.OAuthTokenCategory, tokenHash []byte) (*repos.OAuthTokenModel, error) {
-	var token repos.OAuthTokenModel
-	err := a.db.GetContext(ctx, &token, "SELECT * FROM oauth WHERE category = ? AND token_hash = ? AND expires > ?", category, tokenHash, time.Now().Unix())
+	token, err := a.db.FindOAuthToken(ctx, db.FindOAuthTokenParams{
+		Category:  string(category),
+		TokenHash: tokenHash,
+		Now:       time.Now().Unix(),
+	})
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			err = repos.ErrNoRecord
-		}
-		return nil, fmt.Errorf("find OAuth token: %w", err)
+		return nil, repoErr("find oauth token: %w", err)
 	}
-	return &token, nil
+	return repoOAuthToken(token)
 }
 
-func (a *oauthRepository) Use(ctx context.Context, clientID string, category repos.OAuthTokenCategory, tokenHash []byte) error {
-	result, err := a.db.ExecContext(ctx, "UPDATE oauth SET used = ? WHERE client_id = ? AND category = ? AND token_hash = ?", true, clientID, category, tokenHash)
-	if err != nil {
-		return fmt.Errorf("use OAuth token: %w", err)
-	}
-	if rows, err := result.RowsAffected(); err == nil && rows == 0 {
-		return fmt.Errorf("use OAuth token: %w", repos.ErrNoRecord)
-	}
-	return nil
+func (a *oauthRepository) Use(ctx context.Context, clientID ulid.ULID, category repos.OAuthTokenCategory, tokenHash []byte) error {
+	result, err := a.db.UseOAuthToken(ctx, db.UseOAuthTokenParams{
+		ClientID:  clientID.String(),
+		Category:  string(category),
+		TokenHash: tokenHash,
+	})
+	return repoErrResult("use oauth token: %w", result, err)
 }
 
-func (a *oauthRepository) Delete(ctx context.Context, clientID string, category repos.OAuthTokenCategory, tokenHash []byte) error {
-	result, err := a.db.ExecContext(ctx, "DELETE FROM oauth WHERE client_id = ? AND category = ? AND tokenHash = ?", clientID, category, tokenHash)
-	if err != nil {
-		return fmt.Errorf("delete OAuth token: %w", err)
-	}
-	if rows, err := result.RowsAffected(); err == nil && rows == 0 {
-		return fmt.Errorf("delete OAuth token: %w", repos.ErrNoRecord)
-	}
-	return nil
+func (a *oauthRepository) Delete(ctx context.Context, clientID ulid.ULID, category repos.OAuthTokenCategory, tokenHash []byte) error {
+	result, err := a.db.DeleteOAuthToken(ctx, db.DeleteOAuthTokenParams{
+		ClientID:  clientID.String(),
+		Category:  string(category),
+		TokenHash: tokenHash,
+	})
+	return repoErrResult("delete oauth token: %w", result, err)
 }
 
-func (a *oauthRepository) DeleteByUser(ctx context.Context, clientID, userID string) error {
-	_, err := a.db.ExecContext(ctx, "DELETE FROM oauth WHERE client_id = ? AND user_id = ?", clientID, userID)
-	if err != nil {
-		return fmt.Errorf("delete OAuth token: %w", err)
-	}
-	return nil
+func (a *oauthRepository) DeleteByUser(ctx context.Context, clientID, userID ulid.ULID) error {
+	err := a.db.DeleteOAuthTokenByUser(ctx, db.DeleteOAuthTokenByUserParams{
+		ClientID: clientID.String(),
+		UserID:   userID.String(),
+		Now:      time.Now().Unix(),
+	})
+	return repoErr("delete oauth token by user: %w", err)
 }
 
-func (a *oauthRepository) SetPermissions(ctx context.Context, clientID, userID string, scopes []string) (*repos.PermissionsModel, error) {
-	model := &repos.PermissionsModel{
+func (a *oauthRepository) SetPermissions(ctx context.Context, clientID, userID ulid.ULID, scopes []string) (*repos.PermissionsModel, error) {
+	permissions, err := a.db.SetOAuthPermissions(ctx, db.SetOAuthPermissionsParams{
 		CreatedAt: time.Now().Unix(),
-		ClientID:  clientID,
-		UserID:    userID,
-		Scopes:    scopes,
-	}
-	_, err := a.db.ExecContext(ctx, "REPLACE INTO permissions (created_at, client_id, user_id, scopes) VALUES (?, ?, ?, ?)", model.CreatedAt, model.ClientID, model.UserID, model.Scopes)
+		ClientID:  clientID.String(),
+		UserID:    userID.String(),
+		Scopes:    strings.Join(scopes, ","),
+	})
 	if err != nil {
-		return nil, fmt.Errorf("set permissions: %w", err)
+		return nil, repoErr("set oauth permissions: %w", err)
 	}
-	return model, nil
+	return repoOAuthPermissions(permissions)
 }
 
-func (a *oauthRepository) FindAllPermissions(ctx context.Context, userID string) ([]*repos.PermissionsModel, error) {
-	var model []*repos.PermissionsModel
-	err := a.db.SelectContext(ctx, &model, "SELECT * FROM permissions WHERE user_id = ?", userID)
+func (a *oauthRepository) FindPermissions(ctx context.Context, clientID, userID ulid.ULID) (*repos.PermissionsModel, error) {
+	perms, err := a.db.FindOAuthPermissions(ctx, db.FindOAuthPermissionsParams{
+		ClientID: clientID.String(),
+		UserID:   userID.String(),
+	})
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			err = repos.ErrNoRecord
-		}
-		return nil, fmt.Errorf("find all permissions: %w", err)
+		return nil, repoErr("find oauth permissions: %w", err)
 	}
-	return model, nil
+	return repoOAuthPermissions(perms)
 }
 
-func (a *oauthRepository) FindPermissions(ctx context.Context, clientID, userID string) (*repos.PermissionsModel, error) {
-	var model repos.PermissionsModel
-	err := a.db.GetContext(ctx, &model, "SELECT * FROM permissions WHERE client_id = ? AND user_id = ?", clientID, userID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			err = repos.ErrNoRecord
-		}
-		return nil, fmt.Errorf("find permissions: %w", err)
-	}
-	return &model, nil
-}
-
-func (a *oauthRepository) RevokePermissions(ctx context.Context, clientID, userID string) error {
-	result, err := a.db.ExecContext(ctx, "DELETE FROM permissions WHERE client_id = ? AND user_id = ?", clientID, userID)
-	if err != nil {
-		return fmt.Errorf("revoke permissions: %w", err)
-	}
-	if rows, err := result.RowsAffected(); err == nil && rows == 0 {
-		return fmt.Errorf("revoke permissions: %w", repos.ErrNoRecord)
-	}
-	return nil
+func (a *oauthRepository) RevokePermissions(ctx context.Context, clientID, userID ulid.ULID) error {
+	result, err := a.db.RevokeOAuthPermissions(ctx, db.RevokeOAuthPermissionsParams{
+		ClientID: clientID.String(),
+		UserID:   userID.String(),
+	})
+	return repoErrResult("revoke oauth permissions: %w", result, err)
 }

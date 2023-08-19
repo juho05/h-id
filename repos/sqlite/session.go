@@ -6,13 +6,12 @@ import (
 	"errors"
 	"time"
 
-	"github.com/jmoiron/sqlx"
-
 	"github.com/juho05/h-id/repos"
+	"github.com/juho05/h-id/repos/sqlite/db"
 )
 
 type sessionRepository struct {
-	db *sqlx.DB
+	db *db.Queries
 }
 
 func (db *DB) NewSessionRepository() repos.SessionRepository {
@@ -38,13 +37,14 @@ func (s *sessionRepository) All() (map[string][]byte, error) {
 }
 
 func (s *sessionRepository) DeleteCtx(ctx context.Context, token string) error {
-	_, err := s.db.ExecContext(ctx, "DELETE FROM sessions WHERE token = ?", token)
-	return err
+	return s.db.DeleteSession(ctx, token)
 }
 
 func (s *sessionRepository) FindCtx(ctx context.Context, token string) ([]byte, bool, error) {
-	var data []byte
-	err := s.db.GetContext(ctx, &data, "SELECT data FROM sessions WHERE token = ? AND expires > ?", token, time.Now().Unix())
+	data, err := s.db.FindSession(ctx, db.FindSessionParams{
+		Token: token,
+		Now:   time.Now().Unix(),
+	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, false, nil
@@ -55,32 +55,21 @@ func (s *sessionRepository) FindCtx(ctx context.Context, token string) ([]byte, 
 }
 
 func (s *sessionRepository) CommitCtx(ctx context.Context, token string, data []byte, expires time.Time) error {
-	_, err := s.db.ExecContext(ctx, "REPLACE INTO sessions (token, data, expires) VALUES (?,?,?)", token, data, expires.Unix())
-	return err
+	return s.db.CommitSession(ctx, db.CommitSessionParams{
+		Token:   token,
+		Data:    data,
+		Expires: expires.Unix(),
+	})
 }
 
 func (s *sessionRepository) AllCtx(ctx context.Context) (map[string][]byte, error) {
-	rows, err := s.db.Query("SELECT token, data FROM sessions WHERE expires > ?", time.Now().UTC())
+	sessionRows, err := s.db.FindSessions(ctx, time.Now().Unix())
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	sessions := make(map[string][]byte)
-	for rows.Next() {
-		var token string
-		var data []byte
-		err = rows.Scan(&token, &data)
-		if err != nil {
-			return nil, err
-		}
-		sessions[token] = data
+	sessions := make(map[string][]byte, len(sessionRows))
+	for _, row := range sessionRows {
+		sessions[row.Token] = row.Data
 	}
-
-	err = rows.Err()
-	if err != nil {
-		return nil, err
-	}
-
 	return sessions, nil
 }

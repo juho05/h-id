@@ -9,7 +9,7 @@ CREATE TABLE oauth (
 	scopes TEXT NOT NULL,
 	data BLOB,
 	expires INTEGER NOT NULL,
-	used INTEGER NOT NULL,
+	used BOOLEAN NOT NULL,
 
 	PRIMARY KEY (client_id, category, token_hash),
 	FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,

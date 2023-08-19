@@ -10,11 +10,11 @@ type TokenCategory string
 var TokenConfirmEmail TokenCategory = "confirm-email"
 
 type TokenModel struct {
-	CreatedAt int64         `db:"created_at"`
-	Category  TokenCategory `db:"category"`
-	Key       string        `db:"token_key"`
-	ValueHash []byte        `db:"value_hash"`
-	Expires   int64         `db:"expires"`
+	CreatedAt time.Time
+	Category  TokenCategory
+	Key       string
+	ValueHash []byte
+	Expires   time.Time
 }
 
 type TokenRepository interface {

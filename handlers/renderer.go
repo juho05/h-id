@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/justinas/nosurf"
+	"github.com/oklog/ulid/v2"
 
 	"github.com/juho05/h-id/config"
 	"github.com/juho05/h-id/services"
@@ -27,11 +28,16 @@ type templateData struct {
 }
 
 func (h *Handler) newTemplateData(r *http.Request) templateData {
+	userID := h.AuthService.AuthenticatedUserID(r.Context())
+	var userIDStr string
+	if userID != (ulid.ULID{}) {
+		userIDStr = userID.String()
+	}
 	return templateData{
 		FieldErrors: make(map[string]string),
 		CSRFToken:   nosurf.Token(r),
 		SiteKey:     config.HCaptchaSiteKey(),
-		UserID:      h.AuthService.AuthenticatedUserID(r.Context()),
+		UserID:      userIDStr,
 	}
 }
 

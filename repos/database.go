@@ -1,9 +1,9 @@
 package repos
 
 import (
-	"database/sql/driver"
-	"encoding/json"
-	"fmt"
+	"time"
+
+	"github.com/oklog/ulid/v2"
 )
 
 type DB interface {
@@ -18,28 +18,6 @@ type DB interface {
 }
 
 type BaseModel struct {
-	ID        string `db:"id"`
-	CreatedAt int64  `db:"created_at"`
-}
-
-type StringSlice []string
-
-func (s *StringSlice) Scan(source any) error {
-	if source == nil {
-		*s = nil
-		return nil
-	}
-	src, ok := source.(string)
-	if !ok {
-		panic("cannot scan non-string into StringSlice")
-	}
-	return json.Unmarshal([]byte(src), s)
-}
-
-func (s StringSlice) Value() (driver.Value, error) {
-	value, err := json.Marshal(s)
-	if err != nil {
-		return nil, fmt.Errorf("marshal StringSlice: %w", err)
-	}
-	return string(value), nil
+	ID        ulid.ULID
+	CreatedAt time.Time
 }

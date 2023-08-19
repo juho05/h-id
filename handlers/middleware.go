@@ -13,6 +13,7 @@ import (
 	"github.com/Bananenpro/log"
 	"github.com/go-chi/cors"
 	"github.com/justinas/nosurf"
+	"github.com/oklog/ulid/v2"
 
 	hid "github.com/juho05/h-id"
 
@@ -90,8 +91,8 @@ func csrf(next http.Handler) http.Handler {
 
 func (h *Handler) auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		userID := h.SessionManager.GetString(r.Context(), "authUserID")
-		if userID == "" {
+		userID, ok := h.SessionManager.Get(r.Context(), "authUserID").(ulid.ULID)
+		if !ok {
 			http.Redirect(w, r, fmt.Sprintf("/user/login?redirect=%s", url.QueryEscape(r.URL.RequestURI())), http.StatusSeeOther)
 			return
 		}

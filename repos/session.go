@@ -1,13 +1,15 @@
 package repos
 
 import (
+	"time"
+
 	"github.com/alexedwards/scs/v2"
 )
 
 type SessionModel struct {
-	Token   string `db:"token"`
-	Data    []byte `db:"data"`
-	Expires int64  `db:"expires"`
+	Token   string
+	Data    []byte
+	Expires time.Time
 }
 
 type SessionRepository interface {

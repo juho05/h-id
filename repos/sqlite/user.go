@@ -5,17 +5,16 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
+	"time"
 
-	"github.com/jmoiron/sqlx"
-	"modernc.org/sqlite"
-	sqlite3 "modernc.org/sqlite/lib"
+	"github.com/oklog/ulid/v2"
 
 	"github.com/juho05/h-id/repos"
+	"github.com/juho05/h-id/repos/sqlite/db"
 )
 
 type userRepository struct {
-	db *sqlx.DB
+	db *db.Queries
 }
 
 func (db *DB) NewUserRepository() repos.UserRepository {
@@ -24,33 +23,41 @@ func (db *DB) NewUserRepository() repos.UserRepository {
 	}
 }
 
-func (u *userRepository) Find(ctx context.Context, id string) (*repos.UserModel, error) {
-	var user repos.UserModel
-	err := u.db.GetContext(ctx, &user, "SELECT * FROM users WHERE id = ?", id)
+func repoUser(user db.User) (*repos.UserModel, error) {
+	id, err := ulid.Parse(user.ID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			err = repos.ErrNoRecord
-		}
-		return nil, fmt.Errorf("find user: %w", err)
+		return nil, err
 	}
-	return &user, nil
+	return &repos.UserModel{
+		BaseModel: repos.BaseModel{
+			ID:        id,
+			CreatedAt: time.Unix(user.CreatedAt, 0),
+		},
+		Name:           user.Name,
+		Email:          user.Email,
+		EmailConfirmed: user.EmailConfirmed,
+		PasswordHash:   user.PasswordHash,
+	}, nil
+}
+
+func (u *userRepository) Find(ctx context.Context, id ulid.ULID) (*repos.UserModel, error) {
+	user, err := u.db.FindUser(ctx, id.String())
+	if err != nil {
+		return nil, repoErr("find user: %w", err)
+	}
+	return repoUser(user)
 }
 
 func (u *userRepository) FindByEmail(ctx context.Context, email string) (*repos.UserModel, error) {
-	var user repos.UserModel
-	err := u.db.GetContext(ctx, &user, "SELECT * FROM users WHERE email = ?", email)
+	user, err := u.db.FindUserByEmail(ctx, email)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			err = repos.ErrNoRecord
-		}
-		return nil, fmt.Errorf("find user by email: %w", err)
+		return nil, repoErr("find user by email: %w", err)
 	}
-	return &user, nil
+	return repoUser(user)
 }
 
-func (u *userRepository) GetPasswordHash(ctx context.Context, userID string) ([]byte, error) {
-	var hash []byte
-	err := u.db.GetContext(ctx, &hash, "SELECT password_hash FROM users WHERE id = ?", userID)
+func (u *userRepository) GetPasswordHash(ctx context.Context, userID ulid.ULID) ([]byte, error) {
+	hash, err := u.db.GetUserPasswordHash(ctx, userID.String())
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			err = repos.ErrNoRecord
@@ -61,53 +68,37 @@ func (u *userRepository) GetPasswordHash(ctx context.Context, userID string) ([]
 }
 
 func (u *userRepository) Create(ctx context.Context, name, email string, passwordHash []byte) (*repos.UserModel, error) {
-	user := &repos.UserModel{
-		BaseModel:      newBase(),
+	user, err := u.db.CreateUser(ctx, db.CreateUserParams{
+		ID:             ulid.Make().String(),
+		CreatedAt:      time.Now().Unix(),
 		Name:           name,
 		Email:          email,
 		EmailConfirmed: false,
 		PasswordHash:   passwordHash,
-	}
-	_, err := u.db.ExecContext(ctx, "INSERT INTO users (id, created_at, name, email, email_confirmed, password_hash) VALUES (?, ?, ?, ?, ?, ?)", user.ID, user.CreatedAt, user.Name, user.Email, user.EmailConfirmed, user.PasswordHash)
+	})
 	if err != nil {
-		var sqliteErr *sqlite.Error
-		if errors.As(err, &sqliteErr) && sqliteErr.Code() == sqlite3.SQLITE_CONSTRAINT_UNIQUE && strings.Contains(sqliteErr.Error(), "email") {
-			err = repos.ErrDuplicateEmail
-		}
-		return nil, fmt.Errorf("create user: %w", err)
+		return nil, repoErr("create user name: %w", err)
 	}
-	return user, nil
+	return repoUser(user)
 }
 
-func (u *userRepository) Update(ctx context.Context, id, name string) error {
-	result, err := u.db.ExecContext(ctx, "UPDATE users SET name = ? WHERE id = ?", name, id)
-	if err != nil {
-		return fmt.Errorf("update user: %w", err)
-	}
-	if rows, err := result.RowsAffected(); err == nil && rows == 0 {
-		return fmt.Errorf("update user: %w", repos.ErrNoRecord)
-	}
-	return nil
+func (u *userRepository) UpdateName(ctx context.Context, id ulid.ULID, name string) error {
+	result, err := u.db.UpdateUserName(ctx, db.UpdateUserNameParams{
+		ID:   id.String(),
+		Name: name,
+	})
+	return repoErrResult("update user: %w", result, err)
 }
 
-func (u *userRepository) UpdateEmailConfirmed(ctx context.Context, id string, confirmed bool) error {
-	result, err := u.db.ExecContext(ctx, "UPDATE users SET email_confirmed = ? WHERE id = ?", confirmed, id)
-	if err != nil {
-		return fmt.Errorf("update email confirmed: %w", err)
-	}
-	if rows, err := result.RowsAffected(); err == nil && rows == 0 {
-		return fmt.Errorf("update email confirmed: %w", repos.ErrNoRecord)
-	}
-	return nil
+func (u *userRepository) UpdateEmailConfirmed(ctx context.Context, id ulid.ULID, confirmed bool) error {
+	result, err := u.db.UpdateEmailConfirmed(ctx, db.UpdateEmailConfirmedParams{
+		ID:             id.String(),
+		EmailConfirmed: confirmed,
+	})
+	return repoErrResult("update user email confirmed: %w", result, err)
 }
 
-func (u *userRepository) Delete(ctx context.Context, id string) error {
-	result, err := u.db.ExecContext(ctx, "DELETE FROM users WHERE id = ?", id)
-	if err != nil {
-		return fmt.Errorf("delete user: %w", err)
-	}
-	if rows, err := result.RowsAffected(); err == nil && rows == 0 {
-		return fmt.Errorf("delete user: %w", repos.ErrNoRecord)
-	}
-	return nil
+func (u *userRepository) Delete(ctx context.Context, id ulid.ULID) error {
+	result, err := u.db.DeleteUser(ctx, id.String())
+	return repoErrResult("delete user: %w", result, err)
 }

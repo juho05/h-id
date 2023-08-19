@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/oklog/ulid/v2"
 
 	"github.com/juho05/h-id/repos"
 )
@@ -22,10 +23,10 @@ func (h *Handler) appRoutes(r chi.Router) {
 // POST /app/create
 func (h *Handler) appCreate(w http.ResponseWriter, r *http.Request) {
 	type request struct {
-		Name         string   `form:"name" validate:"required,notblank,min=3,max=32"`
-		Description  string   `form:"description" validate:"max=512"`
-		Website      string   `form:"website" validate:"required,notblank,url"`
-		RedirectURIs []string `form:"redirectURIs" validate:"required,min=1,dive,required,notblank,url"`
+		Name         string `form:"name" validate:"required,notblank,min=3,max=32"`
+		Description  string `form:"description" validate:"max=512"`
+		Website      URL    `form:"website" validate:"required"`
+		RedirectURIs []URL  `form:"redirectURIs" validate:"required,min=1,dive,required"`
 	}
 
 	body, ok := decodeAndValidateBody[request](h, w, r, "createApp", nil)
@@ -34,14 +35,14 @@ func (h *Handler) appCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := h.AuthService.AuthenticatedUserID(r.Context())
-	client, secret, err := h.ClientService.Create(r.Context(), userID, body.Name, body.Description, body.Website, body.RedirectURIs)
+	client, secret, err := h.ClientService.Create(r.Context(), userID, body.Name, body.Description, body.Website.URL, urlsToStdURLs(body.RedirectURIs))
 	if err != nil {
 		serverError(w, err)
 		return
 	}
 
-	h.SessionManager.Put(r.Context(), "clientSecret:"+client.ID, secret)
-	http.Redirect(w, r, "/app/"+client.ID, http.StatusSeeOther)
+	h.SessionManager.Put(r.Context(), "clientSecret:"+client.ID.String(), secret)
+	http.Redirect(w, r, "/app/"+client.ID.String(), http.StatusSeeOther)
 }
 
 // GET /app/list
@@ -60,7 +61,7 @@ func (h *Handler) appList(w http.ResponseWriter, r *http.Request) {
 		}
 		sbuilder.WriteString(c.Name)
 		sbuilder.WriteString("(")
-		sbuilder.WriteString(c.ID)
+		sbuilder.WriteString(c.ID.String())
 		sbuilder.WriteString(")")
 	}
 	w.Write([]byte(sbuilder.String()))
@@ -68,7 +69,11 @@ func (h *Handler) appList(w http.ResponseWriter, r *http.Request) {
 
 // GET /app/{id}
 func (h *Handler) appGet(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
+	id, err := ulid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		clientError(w, http.StatusBadRequest)
+		return
+	}
 	userID := h.AuthService.AuthenticatedUserID(r.Context())
 	client, err := h.ClientService.FindByUserAndID(r.Context(), userID, id)
 	if err != nil {
@@ -82,7 +87,7 @@ func (h *Handler) appGet(w http.ResponseWriter, r *http.Request) {
 
 	response := client.Name
 
-	if secret := h.SessionManager.PopString(r.Context(), "clientSecret:"+client.ID); secret != "" {
+	if secret := h.SessionManager.PopString(r.Context(), "clientSecret:"+client.ID.String()); secret != "" {
 		response += ": " + secret
 	}
 

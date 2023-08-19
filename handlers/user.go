@@ -12,6 +12,7 @@ import (
 
 	"github.com/disintegration/imaging"
 	"github.com/go-chi/chi/v5"
+	"github.com/oklog/ulid/v2"
 
 	"github.com/juho05/h-id/config"
 	"github.com/juho05/h-id/repos"
@@ -70,7 +71,7 @@ func (h *Handler) userSignUp(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.UserService.Create(r.Context(), body.Name, body.Email, body.Password)
 	if err != nil {
-		if errors.Is(err, repos.ErrDuplicateEmail) {
+		if errors.Is(err, repos.ErrExists) {
 			data.Errors = []string{"The user already exists."}
 			data.Form = body
 			if config.HCaptchaSiteKey() != "" {
@@ -208,7 +209,7 @@ func (h *Handler) userConfirmEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := h.AuthService.AuthenticatedUserID(r.Context())
-	if userID == "" {
+	if userID == (ulid.ULID{}) {
 		http.Redirect(w, r, fmt.Sprintf("/user/login?redirect=%s", url.QueryEscape(r.URL.Path)), http.StatusSeeOther)
 		return
 	}
@@ -242,11 +243,11 @@ func (h *Handler) userInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type response struct {
-		Subject       string `json:"sub"`
-		Name          string `json:"name,omitempty"`
-		Email         string `json:"email,omitempty"`
-		EmailVerified bool   `json:"email_verified,omitempty"`
-		Picture       string `json:"picture"`
+		Subject       ulid.ULID `json:"sub"`
+		Name          string    `json:"name,omitempty"`
+		Email         string    `json:"email,omitempty"`
+		EmailVerified bool      `json:"email_verified,omitempty"`
+		Picture       string    `json:"picture"`
 	}
 
 	user, err := h.UserService.Find(r.Context(), h.AuthService.AuthenticatedUserID(r.Context()))
@@ -257,7 +258,7 @@ func (h *Handler) userInfo(w http.ResponseWriter, r *http.Request) {
 
 	resp := response{
 		Subject: user.ID,
-		Picture: config.BaseURL() + "/user/" + user.ID + "/picture",
+		Picture: config.BaseURL() + "/user/" + user.ID.String() + "/picture",
 	}
 	for _, scope := range h.AuthService.AuthorizedScopes(r.Context()) {
 		switch scope {
@@ -279,7 +280,7 @@ func (h *Handler) userProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type userDTO struct {
-		ID    string
+		ID    ulid.ULID
 		Name  string
 		Email string
 	}
@@ -302,7 +303,7 @@ func (h *Handler) updateUserProfile(w http.ResponseWriter, r *http.Request) {
 		Name string `form:"name" validate:"required,notblank,min=3,max=32"`
 	}
 	type userDTO struct {
-		ID    string
+		ID    ulid.ULID
 		Name  string
 		Email string
 	}
@@ -361,7 +362,11 @@ func (h *Handler) profilePicture(w http.ResponseWriter, r *http.Request) {
 		size = config.ProfilePictureSize()
 	}
 
-	userID := chi.URLParam(r, "id")
+	userID, err := ulid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		clientError(w, http.StatusBadRequest)
+		return
+	}
 
 	etag := h.UserService.ProfilePictureETag(userID, size)
 	if matchETagHeader(etag, r.Header.Get("If-None-Match"), true) {

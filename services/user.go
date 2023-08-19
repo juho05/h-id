@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 
 	"github.com/disintegration/imaging"
+	"github.com/oklog/ulid/v2"
 
 	"github.com/Bananenpro/log"
 
@@ -23,13 +24,13 @@ import (
 )
 
 type UserService interface {
-	Find(ctx context.Context, id string) (*repos.UserModel, error)
+	Find(ctx context.Context, id ulid.ULID) (*repos.UserModel, error)
 	Create(ctx context.Context, name, email, password string) (*repos.UserModel, error)
-	Update(ctx context.Context, id, name string) error
-	SetProfilePicture(userID string, img image.Image) error
-	LoadProfilePicture(userID string, size int, writer io.Writer) error
-	ProfilePictureETag(userID string, size int) string
-	Delete(ctx context.Context, id, password string) error
+	Update(ctx context.Context, id ulid.ULID, name string) error
+	SetProfilePicture(userID ulid.ULID, img image.Image) error
+	LoadProfilePicture(userID ulid.ULID, size int, writer io.Writer) error
+	ProfilePictureETag(userID ulid.ULID, size int) string
+	Delete(ctx context.Context, id ulid.ULID, password string) error
 }
 
 type userService struct {
@@ -44,7 +45,7 @@ func NewUserService(userRepository repos.UserRepository, authService AuthService
 	}
 }
 
-func (u *userService) Find(ctx context.Context, id string) (*repos.UserModel, error) {
+func (u *userService) Find(ctx context.Context, id ulid.ULID) (*repos.UserModel, error) {
 	return u.userRepo.Find(ctx, id)
 }
 
@@ -61,11 +62,11 @@ func (u *userService) Create(ctx context.Context, name, email, password string) 
 	return user, nil
 }
 
-func (u *userService) Update(ctx context.Context, id, name string) error {
-	return u.userRepo.Update(ctx, id, name)
+func (u *userService) Update(ctx context.Context, id ulid.ULID, name string) error {
+	return u.userRepo.UpdateName(ctx, id, name)
 }
 
-func (u *userService) SetProfilePicture(userID string, img image.Image) error {
+func (u *userService) SetProfilePicture(userID ulid.ULID, img image.Image) error {
 	size := img.Bounds().Dx()
 	if img.Bounds().Dx() > img.Bounds().Dy() {
 		size = img.Bounds().Dy()
@@ -85,7 +86,7 @@ func (u *userService) SetProfilePicture(userID string, img image.Image) error {
 	return nil
 }
 
-func (u *userService) LoadProfilePicture(userID string, size int, writer io.Writer) error {
+func (u *userService) LoadProfilePicture(userID ulid.ULID, size int, writer io.Writer) error {
 	var reader io.Reader
 	file, err := os.Open(profilePicturePath(userID))
 	if err != nil {
@@ -110,7 +111,7 @@ func (u *userService) LoadProfilePicture(userID string, size int, writer io.Writ
 	return nil
 }
 
-func (u *userService) ProfilePictureETag(userID string, size int) string {
+func (u *userService) ProfilePictureETag(userID ulid.ULID, size int) string {
 	stat, err := os.Stat(profilePicturePath(userID))
 	if err != nil {
 		return fmt.Sprintf("%x", md5.Sum([]byte("default")))
@@ -118,11 +119,11 @@ func (u *userService) ProfilePictureETag(userID string, size int) string {
 	return fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%s%d", stat.Name(), stat.ModTime().UnixMilli()+stat.Size()+int64(size)))))
 }
 
-func profilePicturePath(userID string) string {
-	return filepath.Join(config.ProfilePictureDir(), base64.URLEncoding.EncodeToString([]byte(userID))) + ".jpg"
+func profilePicturePath(userID ulid.ULID) string {
+	return filepath.Join(config.ProfilePictureDir(), base64.URLEncoding.EncodeToString(userID.Bytes())) + ".jpg"
 }
 
-func (u *userService) Delete(ctx context.Context, id, password string) error {
+func (u *userService) Delete(ctx context.Context, id ulid.ULID, password string) error {
 	if err := u.authService.VerifyPasswordByID(ctx, id, password); err != nil {
 		return fmt.Errorf("delete user: %w", err)
 	}
@@ -132,7 +133,7 @@ func (u *userService) Delete(ctx context.Context, id, password string) error {
 		return err
 	}
 
-	err = os.Remove(filepath.Join(config.ProfilePictureDir(), base64.StdEncoding.EncodeToString([]byte(id))) + ".jpg")
+	err = os.Remove(filepath.Join(config.ProfilePictureDir(), base64.StdEncoding.EncodeToString(id.Bytes())) + ".jpg")
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		log.Errorf("Failed to delete profile picture of %s", id)
 	}
