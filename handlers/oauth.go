@@ -13,7 +13,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/juho05/h-id/config"
 	"github.com/juho05/h-id/repos"
 	"github.com/juho05/h-id/services"
 )
@@ -267,7 +266,7 @@ func (h *Handler) oauthCerts(w http.ResponseWriter, r *http.Request) {
 		Keys []key `json:"keys"`
 	}
 
-	pubKey := config.JWTPublicKey()
+	pubKey := h.AuthService.PublicJWTKey()
 
 	n := base64.URLEncoding.EncodeToString(pubKey.N.Bytes())
 	e := base64.URLEncoding.EncodeToString(big.NewInt(int64(pubKey.E)).Bytes())

@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/gob"
@@ -30,6 +31,8 @@ import (
 )
 
 type AuthService interface {
+	PublicJWTKey() *rsa.PublicKey
+
 	Login(ctx context.Context, email, password string) error
 	Logout(ctx context.Context) error
 	HashPassword(password string) ([]byte, error)
@@ -74,8 +77,12 @@ type authService struct {
 	clientRepo     repos.ClientRepository
 	tokenRepo      repos.TokenRepository
 	oauthRepo      repos.OAuthRepository
+	systemRepo     repos.SystemRepository
 	sessionManager *scs.SessionManager
 	emailService   EmailService
+
+	jwtKeyPriv *rsa.PrivateKey
+	jwtKeyPub  *rsa.PublicKey
 }
 
 type AuthRequest struct {
@@ -87,15 +94,48 @@ type AuthRequest struct {
 	NeedsConsent bool
 }
 
-func NewAuthService(userRepository repos.UserRepository, tokenRepository repos.TokenRepository, oauthRepository repos.OAuthRepository, clientRepository repos.ClientRepository, sessionManager *scs.SessionManager, emailService EmailService) AuthService {
-	return &authService{
+func NewAuthService(userRepository repos.UserRepository, tokenRepository repos.TokenRepository, oauthRepository repos.OAuthRepository, clientRepository repos.ClientRepository, systemRepository repos.SystemRepository, sessionManager *scs.SessionManager, emailService EmailService) (AuthService, error) {
+	a := &authService{
 		userRepo:       userRepository,
 		tokenRepo:      tokenRepository,
 		oauthRepo:      oauthRepository,
 		clientRepo:     clientRepository,
+		systemRepo:     systemRepository,
 		sessionManager: sessionManager,
 		emailService:   emailService,
 	}
+	err := a.initKeys(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	return a, nil
+}
+
+func (a *authService) initKeys(ctx context.Context) error {
+	if priv, pub, err := a.systemRepo.GetJWTKeys(ctx); err == nil {
+		a.jwtKeyPriv = priv
+		a.jwtKeyPub = pub
+		log.Info("Using existing JWT keys...")
+	} else if errors.Is(err, repos.ErrNoRecord) {
+		log.Info("Generating new JWT keys...")
+		key, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			return fmt.Errorf("generate JWT RSA keys: %w", err)
+		}
+		err = a.systemRepo.InsertJWTKeys(ctx, key, &key.PublicKey)
+		if err != nil {
+			return fmt.Errorf("init keys: %w", err)
+		}
+		a.jwtKeyPriv = key
+		a.jwtKeyPub = &key.PublicKey
+	} else {
+		return fmt.Errorf("init keys: %w", err)
+	}
+	return nil
+}
+
+func (a *authService) PublicJWTKey() *rsa.PublicKey {
+	return a.jwtKeyPub
 }
 
 func (a *authService) StartOAuthCodeFlow(ctx context.Context, clientID, redirectURI, responseType, scope, state, nonce string) error {
@@ -263,7 +303,7 @@ func (a *authService) createIDToken(clientID, userID, nonce string) (string, err
 		},
 		Nonce: nonce,
 	})
-	return token.SignedString(config.JWTPrivateKey())
+	return token.SignedString(a.jwtKeyPriv)
 }
 
 func (a *authService) VerifyClientCredentials(ctx context.Context, clientID, clientSecret string) error {

@@ -7,6 +7,7 @@ import (
 )
 
 type DB interface {
+	NewSystemRepository() SystemRepository
 	NewUserRepository() UserRepository
 	NewSessionRepository() SessionRepository
 	NewTokenRepository() TokenRepository

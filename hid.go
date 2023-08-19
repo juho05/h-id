@@ -19,9 +19,10 @@ var StartTime = time.Now()
 var dataFS embed.FS
 
 var (
-	HTMLFS   fs.FS
-	StaticFS fs.FS
-	EmailFS  fs.FS
+	HTMLFS       fs.FS
+	StaticFS     fs.FS
+	EmailFS      fs.FS
+	MigrationsFS fs.FS
 )
 
 var OpenIDConfiguration []byte
@@ -40,6 +41,10 @@ func Initialize() {
 		log.Fatal(err)
 	}
 	EmailFS, err = fs.Sub(dataFS, "data/email")
+	if err != nil {
+		log.Fatal(err)
+	}
+	MigrationsFS, err = fs.Sub(dataFS, "data/migrations")
 	if err != nil {
 		log.Fatal(err)
 	}

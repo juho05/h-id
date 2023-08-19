@@ -37,6 +37,7 @@ func run() error {
 	tokenRepo := db.NewTokenRepository()
 	clientRepo := db.NewClientRepository()
 	oauthRepo := db.NewOAuthRepository()
+	systemRepo := db.NewSystemRepository()
 
 	handler.SessionManager = scs.New()
 	handler.SessionManager.Store = db.NewSessionRepository()
@@ -46,7 +47,10 @@ func run() error {
 
 	emailService := services.NewEmailService(hid.EmailFS)
 
-	handler.AuthService = services.NewAuthService(userRepo, tokenRepo, oauthRepo, clientRepo, handler.SessionManager, emailService)
+	handler.AuthService, err = services.NewAuthService(userRepo, tokenRepo, oauthRepo, clientRepo, systemRepo, handler.SessionManager, emailService)
+	if err != nil {
+		return fmt.Errorf("new auth service: %w", err)
+	}
 	handler.UserService = services.NewUserService(userRepo, handler.AuthService)
 	handler.ClientService = services.NewClientService(clientRepo)
 

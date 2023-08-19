@@ -1,0 +1,8 @@
+.env
+database.sqlite
+database.sqlite-shm
+database.sqlite-wal
+/data/tls/
+/data/rsa/
+/profile_pictures/
+/bin

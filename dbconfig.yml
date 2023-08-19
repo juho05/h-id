@@ -1,4 +1,9 @@
 development:
-    dialect: sqlite3
-    datasource: database.sqlite
-    dir: migrations/sqlite
+  dialect: sqlite3
+  datasource: database.sqlite
+  dir: data/migrations/sqlite
+
+production:
+  dialect: postgres
+  datasource: dbname=hid
+  dir: data/migrations/postgres
