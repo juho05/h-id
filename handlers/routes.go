@@ -28,7 +28,9 @@ func (h *Handler) RegisterRoutes() {
 	h.registerStaticRouts()
 	h.Router.Route("/.well-known", h.wellKnownRoutes)
 
-	h.Router.With(h.SessionManager.LoadAndSave, csrf).Get("/", h.newPage("index"))
+	h.Router.With(h.SessionManager.LoadAndSave, csrf, h.auth).Get("/", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+	})
 	h.Router.With(h.SessionManager.LoadAndSave, csrf).Route("/user", h.userRoutes)
 	h.Router.With(h.SessionManager.LoadAndSave, csrf).Route("/app", h.appRoutes)
 	h.Router.With(corsHeaders, h.SessionManager.LoadAndSave).Route("/oauth", h.oauthRoutes)
