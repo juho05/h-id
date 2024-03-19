@@ -27,9 +27,10 @@ type statusResponseWriter struct {
 }
 
 func (s *statusResponseWriter) WriteHeader(code int) {
-	if s.status < 200 {
-		s.status = code
+	if s.status >= 200 {
+		return
 	}
+	s.status = code
 	s.ResponseWriter.WriteHeader(code)
 }
 

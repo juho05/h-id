@@ -123,7 +123,7 @@ func DBConnection() (con string) {
 	defer func() {
 		values["DB_CONNECTION"] = con
 	}()
-	def := "database.sqlite"
+	def := "file:database.sqlite?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(3000)"
 	con = os.Getenv("DB_CONNECTION")
 	if con == "" {
 		return def

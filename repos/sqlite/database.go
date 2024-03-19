@@ -52,6 +52,10 @@ func Connect(connectionString string) (repos.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("enable foreign keys: %w", err)
 	}
+	_, err = rawDB.Exec("PRAGMA busy_timeout = 3000")
+	if err != nil {
+		return nil, fmt.Errorf("enable foreign keys: %w", err)
+	}
 
 	if config.AutoMigrate() {
 		err = autoMigrate(rawDB)
