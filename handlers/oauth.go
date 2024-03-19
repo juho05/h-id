@@ -15,6 +15,7 @@ import (
 
 	"github.com/juho05/h-id/repos"
 	"github.com/juho05/h-id/services"
+	"github.com/juho05/log"
 )
 
 func (h *Handler) oauthRoutes(r chi.Router) {
@@ -38,17 +39,20 @@ func (h *Handler) oauthAuth(w http.ResponseWriter, r *http.Request) {
 	clientID, err := ulid.Parse(clientIDStr)
 	if err != nil {
 		clientError(w, http.StatusBadRequest)
+		log.Error("Misformed client ID")
 		return
 	}
 
 	redirectURI, err := url.Parse(redirectURIStr)
 	if err != nil {
 		clientError(w, http.StatusBadRequest)
+		log.Errorf("Misformed redirect URI: %s", redirectURIStr)
 		return
 	}
 
 	if responseType == "" {
 		clientError(w, http.StatusBadRequest)
+		log.Error("Missing response type in request")
 		return
 	}
 
@@ -58,6 +62,7 @@ func (h *Handler) oauthAuth(w http.ResponseWriter, r *http.Request) {
 			clientError(w, http.StatusNotFound)
 		} else if errors.Is(err, services.ErrInvalidRedirectURI) {
 			clientError(w, http.StatusBadRequest)
+			log.Errorf("Invalid redirect URI: %s", redirectURI.String())
 		} else if errors.Is(err, services.ErrUnsupportedResponseType) {
 			q := redirectURI.Query()
 			q.Add("error", "unsupported_response_type")
@@ -182,7 +187,7 @@ func (h *Handler) oauthToken(w http.ResponseWriter, r *http.Request) {
 	type request struct {
 		GrantType    string `form:"grant_type"`
 		Code         string `form:"code"`
-		RedirectURI  URL    `form:"redirect_uri"`
+		RedirectURI  string `form:"redirect_uri"`
 		RefreshToken string `form:"refresh_token"`
 	}
 
@@ -196,6 +201,11 @@ func (h *Handler) oauthToken(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		w.Header().Set("WWW-Authenticate", "Basic realm=\"client authentication\"")
 		respondJSONError(w, errors.New("invalid_client"), http.StatusUnauthorized)
+		return
+	}
+	redirectURI, err := url.Parse(data.RedirectURI)
+	if err != nil {
+		respondJSONError(w, errors.New("invalid_request"), http.StatusBadRequest)
 		return
 	}
 	clientIDStr, err := url.QueryUnescape(username)
@@ -222,7 +232,7 @@ func (h *Handler) oauthToken(w http.ResponseWriter, r *http.Request) {
 		grant = data.RefreshToken
 	}
 
-	access, refresh, id, err := h.AuthService.OAuthGenerateTokens(r.Context(), clientID, clientSecret, data.RedirectURI.URL, data.GrantType, grant)
+	access, refresh, id, err := h.AuthService.OAuthGenerateTokens(r.Context(), clientID, clientSecret, redirectURI, data.GrantType, grant)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidCredentials) {
 			w.Header().Set("WWW-Authenticate", "Basic realm=\"client authentication\"")

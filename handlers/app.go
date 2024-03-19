@@ -86,6 +86,9 @@ func (h *Handler) appGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := client.Name
+	for _, u := range client.RedirectURIs {
+		response += "\n" + u.String()
+	}
 
 	if secret := h.SessionManager.PopString(r.Context(), "clientSecret:"+client.ID.String()); secret != "" {
 		response += ": " + secret

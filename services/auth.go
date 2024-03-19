@@ -147,7 +147,15 @@ func (a *authService) StartOAuthCodeFlow(ctx context.Context, clientID ulid.ULID
 		return fmt.Errorf("start OAuth code flow: %w", err)
 	}
 
-	if !slices.Contains(client.RedirectURIs, redirectURI) {
+	var validRedirectURI bool
+	redirectURIStr := redirectURI.String()
+	for _, ru := range client.RedirectURIs {
+		if ru.String() == redirectURIStr {
+			validRedirectURI = true
+			break
+		}
+	}
+	if !validRedirectURI {
 		return ErrInvalidRedirectURI
 	}
 
