@@ -42,6 +42,7 @@ var translations = map[string]map[string]string{
 		"invalidCredentials":   "Invalid credentials",
 		"scopesProfile":        "View user and account information",
 		"scopesEmail":          "View your email address",
+		"pressSaveToUpload":    "Press 'save' to update your profile picture.",
 	},
 	"de": {
 		"login":                "Anmelden",
@@ -73,6 +74,7 @@ var translations = map[string]map[string]string{
 		"invalidCredentials":   "Ungültige Zugangsdaten",
 		"scopesProfile":        "Profil und Account Informationen ansehen",
 		"scopesEmail":          "Email Adresse ansehen",
+		"pressSaveToUpload":    "Drück 'speichern', um dein Profilbild zu aktualisieren.",
 	},
 }
 

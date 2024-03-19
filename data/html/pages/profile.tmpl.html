@@ -12,24 +12,27 @@
   {{end}}
 
   <form class="form" action="/user/profile" method="post" enctype="multipart/form-data">
-    <div>
+    <div id="profilePage">
       <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
-
-      <label class="input-label">ID: {{.Data.ID}}</label>
-      <label class="input-label">{{translate .Lang "email"}}: {{.Data.Email}}</label>
+      <div id="profilePictureContainer">
+        <img class="clickable" id="profilePicture" src="/user/{{.Data.ID}}/picture?size=512">
+        <input hidden type="file" name="profile_picture" id="profilePictureInput">
+        <label id="profilePictureSaveHint" class="hint-label invisible" for="profilePicture">{{translate .Lang "pressSaveToUpload"}}</label>
+        {{with .FieldErrors.ProfilePicture}}<label class="error-label" for="profilePicture">{{.}}</label>{{end}}
+      </div>
 
       <label class="input-label" for="name">{{translate .Lang "name"}}:</label>
       <input class="{{if .FieldErrors.Name}}invalid-field{{end}}" id="name" type="text" name="name" maxlength="32" value="{{if .Form}}{{.Form.Name}}{{else}}{{.Data.Name}}{{end}}" required>
       {{with .FieldErrors.Name}}<label class="error-label" for="name">{{.}}</label>{{end}}
 
-      <label class="input-label" for="profilePicture">{{translate .Lang "profilePicture"}}:</label>
-      <img src="/user/{{.Data.ID}}/picture?size=128"><br>
-      <input type="file" name="profile_picture" id="profilePicture">
-      {{with .FieldErrors.ProfilePicture}}<label class="error-label" for="profilePicture">{{.}}</label>{{end}}
+      <label class="input-label" for="email">{{translate .Lang "email"}}:</label>
+      <input id="email" type="email" name="email" value="{{if .Form}}{{.Form.Email}}{{else}}{{.Data.Email}}{{end}}" required disabled>
     </div>
     <div class="submit-div">
       <input class="btn" type="submit" value="{{translate .Lang "save"}}">
     </div>
   </form>
+
+  <script src="/static/js/profile.js"></script>
 </div>
 {{end}}
