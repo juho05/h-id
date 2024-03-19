@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Bananenpro/log"
 	"github.com/alexedwards/scs/v2"
+	"github.com/juho05/log"
 
 	hid "github.com/juho05/h-id"
 

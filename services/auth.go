@@ -26,7 +26,7 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/xdg-go/pbkdf2"
 
-	"github.com/Bananenpro/log"
+	"github.com/juho05/log"
 
 	"github.com/juho05/h-id/config"
 	"github.com/juho05/h-id/repos"

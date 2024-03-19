@@ -12,7 +12,7 @@ import (
 	"modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 
-	"github.com/Bananenpro/log"
+	"github.com/juho05/log"
 
 	hid "github.com/juho05/h-id"
 	"github.com/juho05/h-id/config"

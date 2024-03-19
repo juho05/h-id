@@ -8,7 +8,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/Bananenpro/log"
+	"github.com/juho05/log"
 
 	"github.com/juho05/h-id/config"
 )

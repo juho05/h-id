@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Bananenpro/log"
+	"github.com/juho05/log"
 )
 
 var values = make(map[string]any)

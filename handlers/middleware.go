@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Bananenpro/log"
 	"github.com/go-chi/cors"
+	"github.com/juho05/log"
 	"github.com/justinas/nosurf"
 	"github.com/oklog/ulid/v2"
 

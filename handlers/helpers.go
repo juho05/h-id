@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Bananenpro/log"
 	"github.com/go-playground/form/v4"
 	"github.com/go-playground/locales/de"
 	"github.com/go-playground/locales/en"
@@ -20,6 +19,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/go-playground/validator/v10/non-standard/validators"
 	entrans "github.com/go-playground/validator/v10/translations/en"
+	"github.com/juho05/log"
 
 	"github.com/juho05/h-id/config"
 	"github.com/juho05/h-id/repos"

@@ -15,7 +15,7 @@ import (
 	"github.com/disintegration/imaging"
 	"github.com/oklog/ulid/v2"
 
-	"github.com/Bananenpro/log"
+	"github.com/juho05/log"
 
 	hid "github.com/juho05/h-id"
 
