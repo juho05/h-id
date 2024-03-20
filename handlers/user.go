@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"fmt"
+	"image/jpeg"
 	"io"
 	"mime"
 	"net/http"
@@ -17,9 +18,18 @@ import (
 	"github.com/juho05/h-id/config"
 	"github.com/juho05/h-id/repos"
 	"github.com/juho05/h-id/services"
+	"github.com/juho05/log"
 )
 
 func (h *Handler) userRoutes(r chi.Router) {
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !strings.HasPrefix(r.URL.Path, "/user/2fa") {
+				h.SessionManager.Remove(r.Context(), "validPassword")
+			}
+			next.ServeHTTP(w, r)
+		})
+	})
 	r.Get("/signup", h.userSignUpPage)
 	r.Post("/signup", h.userSignUp)
 	r.Get("/login", h.userLoginPage)
@@ -28,6 +38,13 @@ func (h *Handler) userRoutes(r chi.Router) {
 
 	r.Get("/confirmEmail", h.userConfirmEmailPage)
 	r.Post("/confirmEmail", h.userConfirmEmail)
+
+	r.Get("/2fa/otp/activate", h.userActivateOTPPage)
+	r.Post("/2fa/otp/activate", h.userActivateOTP)
+	r.Get("/2fa/otp/activate/qr", h.userActivateOTPQRCode)
+
+	r.Get("/2fa/otp/verify", h.verifyOTPPage)
+	r.Post("/2fa/otp/verify", h.verifyOTP)
 
 	r.With(corsHeaders).Get("/{id}/picture", h.profilePicture)
 	r.With(corsHeaders, h.oauth()).HandleFunc("/info", h.userInfo)
@@ -84,13 +101,17 @@ func (h *Handler) userSignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.SessionManager.Put(r.Context(), "email", user.Email)
-
-	redirectQuery := ""
-	if redirect := h.SessionManager.PopString(r.Context(), "loginRedirect"); redirect != "" {
-		redirectQuery = "?redirect=" + url.QueryEscape(redirect)
+	err = h.AuthService.Login(r.Context(), user.ID)
+	if err != nil {
+		serverError(w, err)
+		return
 	}
-	http.Redirect(w, r, "/user/login"+redirectQuery, http.StatusSeeOther)
+
+	if redirect := h.SessionManager.PopString(r.Context(), "loginRedirect"); redirect != "" {
+		http.Redirect(w, r, redirect, http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
 }
 
 func (h *Handler) userLoginPage(w http.ResponseWriter, r *http.Request) {
@@ -129,7 +150,7 @@ func (h *Handler) userLogin(w http.ResponseWriter, r *http.Request) {
 
 	lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
 
-	err := h.AuthService.Login(r.Context(), body.Email, body.Password)
+	user, err := h.AuthService.VerifyUsernamePassword(r.Context(), body.Email, body.Password)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidCredentials) {
 			data := h.newTemplateData(r)
@@ -140,6 +161,71 @@ func (h *Handler) userLogin(w http.ResponseWriter, r *http.Request) {
 		} else {
 			serverError(w, err)
 		}
+		return
+	}
+	if !user.OTPActive {
+		redirectQuery := ""
+		if redirect := h.SessionManager.PopString(r.Context(), "loginRedirect"); redirect != "" {
+			redirectQuery = "?redirect=" + url.QueryEscape(redirect)
+		}
+		http.Redirect(w, r, "/user/2fa/otp/activate"+redirectQuery, http.StatusSeeOther)
+	} else {
+		http.Redirect(w, r, "/user/2fa/otp/verify", http.StatusSeeOther)
+	}
+}
+
+func (h *Handler) verifyOTPPage(w http.ResponseWriter, r *http.Request) {
+	userID, ok := h.SessionManager.Get(r.Context(), "validPassword").(ulid.ULID)
+	if !ok || userID == (ulid.ULID{}) {
+		redirectQuery := ""
+		if redirect := h.SessionManager.PopString(r.Context(), "loginRedirect"); redirect != "" {
+			redirectQuery = "?redirect=" + url.QueryEscape(redirect)
+		}
+		http.Redirect(w, r, "/user/login"+redirectQuery, http.StatusSeeOther)
+		return
+	}
+	h.Renderer.render(w, r, http.StatusOK, "verifyOTP", h.newTemplateData(r))
+}
+
+// POST /user/2fa/otp/verify
+func (h *Handler) verifyOTP(w http.ResponseWriter, r *http.Request) {
+	type request struct {
+		Code string `form:"code" validate:"required,numeric,len=6"`
+	}
+	body, ok := decodeAndValidateBody[request](h, w, r, "verifyOTP", nil)
+	if !ok {
+		return
+	}
+
+	userID, ok := h.SessionManager.Get(r.Context(), "validPassword").(ulid.ULID)
+	if !ok || userID == (ulid.ULID{}) {
+		redirectQuery := ""
+		if redirect := h.SessionManager.PopString(r.Context(), "loginRedirect"); redirect != "" {
+			redirectQuery = "?redirect=" + url.QueryEscape(redirect)
+		}
+		http.Redirect(w, r, "/user/login"+redirectQuery, http.StatusSeeOther)
+		return
+	}
+
+	lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
+
+	err := h.AuthService.VerifyOTPCode(r.Context(), userID, body.Code)
+	if err != nil {
+		if errors.Is(err, services.ErrInvalidCredentials) {
+			data := h.newTemplateData(r)
+			e, _ := services.Translate(lang, "invalidCredentials")
+			data.Errors = []string{e}
+			data.Form = body
+			h.Renderer.render(w, r, http.StatusUnauthorized, "verifyOTP", data)
+		} else {
+			serverError(w, err)
+		}
+		return
+	}
+
+	err = h.AuthService.Login(r.Context(), userID)
+	if err != nil {
+		serverError(w, err)
 		return
 	}
 
@@ -270,6 +356,166 @@ func (h *Handler) userInfo(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	respondJSON(w, http.StatusOK, resp)
+}
+
+// GET /user/2fa/otp/activate
+func (h *Handler) userActivateOTPPage(w http.ResponseWriter, r *http.Request) {
+	if redirect := r.URL.Query().Get("redirect"); redirect != "" {
+		u, err := url.Parse(redirect)
+		if err == nil {
+			if u.IsAbs() {
+				clientError(w, http.StatusBadRequest)
+				return
+			}
+			h.SessionManager.Put(r.Context(), "activateOTPRedirect", "/"+strings.TrimPrefix(redirect, "/"))
+		}
+	} else {
+		h.SessionManager.Remove(r.Context(), "activateOTPRedirect")
+	}
+
+	userID := h.AuthService.AuthenticatedUserID(r.Context())
+	if userID == (ulid.ULID{}) {
+		var ok bool
+		userID, ok = h.SessionManager.Get(r.Context(), "validPassword").(ulid.ULID)
+		if !ok || userID == (ulid.ULID{}) {
+			if redirect := h.SessionManager.PopString(r.Context(), "activateOTPRedirect"); redirect != "" {
+				http.Redirect(w, r, redirect, http.StatusSeeOther)
+			} else {
+				http.Redirect(w, r, "/", http.StatusSeeOther)
+			}
+			return
+		}
+	}
+	user, err := h.UserService.Find(r.Context(), userID)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+
+	if user.OTPActive {
+		if redirect := h.SessionManager.PopString(r.Context(), "activateOTPRedirect"); redirect != "" {
+			http.Redirect(w, r, redirect, http.StatusSeeOther)
+			return
+		}
+		http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+		return
+	}
+
+	key, err := h.AuthService.GenerateOTPKey(r.Context(), user)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	type response struct {
+		Secret string
+	}
+	tmplData := h.newTemplateData(r)
+	tmplData.Form = response{
+		Secret: key.Secret(),
+	}
+	h.Renderer.render(w, r, http.StatusOK, "activateOTP", tmplData)
+}
+
+// POST /user/2fa/otp/activate
+func (h *Handler) userActivateOTP(w http.ResponseWriter, r *http.Request) {
+	userID := h.AuthService.AuthenticatedUserID(r.Context())
+	if userID == (ulid.ULID{}) {
+		var ok bool
+		userID, ok = h.SessionManager.Get(r.Context(), "validPassword").(ulid.ULID)
+		if !ok || userID == (ulid.ULID{}) {
+			if redirect := h.SessionManager.PopString(r.Context(), "activateOTPRedirect"); redirect != "" {
+				http.Redirect(w, r, redirect, http.StatusSeeOther)
+			} else {
+				http.Redirect(w, r, "/", http.StatusSeeOther)
+			}
+			return
+		}
+	}
+
+	type request struct {
+		Secret string `form:"secret" validate:"required"`
+		Code   string `form:"code" validate:"required,numeric,len=6"`
+	}
+	body, ok := decodeAndValidateBody[request](h, w, r, "activateOTP", nil)
+	if !ok {
+		return
+	}
+
+	lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
+	err := h.AuthService.ActivateOTPKey(r.Context(), userID, body.Code)
+	if err != nil {
+		if errors.Is(err, services.ErrInvalidCredentials) {
+			data := h.newTemplateData(r)
+			e, _ := services.Translate(lang, "invalidCredentials")
+			data.Errors = []string{e}
+			data.Form = body
+			h.Renderer.render(w, r, http.StatusUnauthorized, "activateOTP", data)
+		} else {
+			serverError(w, err)
+		}
+		return
+	}
+
+	if h.AuthService.AuthenticatedUserID(r.Context()) == (ulid.ULID{}) {
+		err = h.AuthService.Login(r.Context(), userID)
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+	}
+
+	if redirect := h.SessionManager.PopString(r.Context(), "activateOTPRedirect"); redirect != "" {
+		http.Redirect(w, r, redirect, http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+}
+
+// GET /user/2fa/otp/activate/qr
+func (h *Handler) userActivateOTPQRCode(w http.ResponseWriter, r *http.Request) {
+	userID := h.AuthService.AuthenticatedUserID(r.Context())
+	if userID == (ulid.ULID{}) {
+		var ok bool
+		userID, ok = h.SessionManager.Get(r.Context(), "validPassword").(ulid.ULID)
+		if !ok || userID == (ulid.ULID{}) {
+			clientError(w, http.StatusUnauthorized)
+			return
+		}
+	}
+	user, err := h.UserService.Find(r.Context(), userID)
+	if err != nil {
+		if errors.Is(err, repos.ErrNoRecord) {
+			clientError(w, http.StatusUnauthorized)
+		} else {
+			serverError(w, err)
+		}
+		return
+	}
+	if user.OTPActive {
+		clientError(w, http.StatusForbidden)
+		return
+	}
+
+	sizeStr := r.URL.Query().Get("size")
+	size := 500
+	if sizeStr != "" {
+		size, err = strconv.Atoi(sizeStr)
+		if err != nil || size < 1 || size > 2048 {
+			clientError(w, http.StatusBadRequest)
+			return
+		}
+	}
+	img, err := user.OTPKey.Image(size, size)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.WriteHeader(http.StatusOK)
+	err = jpeg.Encode(w, img, nil)
+	if err != nil {
+		log.Error("encode otp qr code: %w", err)
+	}
 }
 
 // GET /user/profile

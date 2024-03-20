@@ -1,0 +1,35 @@
+{{define "title"}}{{translate .Lang "activate2FA"}}{{end}}
+
+{{define "main"}}
+<div class="form-panel">
+  <h2 class="form-title">{{translate .Lang "activate2FA"}}</h2>
+
+  <div id="qr-code-container">
+    <img id="qr-code" src="/user/2fa/otp/activate/qr?size=500" alt="QR code">
+  </div>
+  <label id="left-aligned" for="secret-key">{{translate .Lang "secretKey"}}:</label>
+  <p id="otp-secret">{{.Form.Secret}}</p>
+
+  <form class="form" action="/user/2fa/otp/activate" method="POST">
+    <div>
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <input type="hidden" name="secret" value="{{.Form.Secret}}">
+
+      <label class="input-label" for="code">{{translate .Lang "code"}}:</label>
+      <input class="{{if .FieldErrors.Code}}invalid-field{{end}}" id="code" type="text" name="code" autocomplete="off" required maxlength="6" autofocus>
+      {{with .FieldErrors.Code}}<label class="error-label" for="code">{{.}}</label>{{end}}
+      {{with .Errors}}
+      <ul class="error-list">
+        {{range .}}
+        <li>{{.}}</li>
+        {{end}}
+      </ul>
+      {{end}}
+    </div>
+    <div class="submit-div">
+      <input class="btn" type="submit" value="{{translate .Lang "confirm"}}">
+    </div>
+  </form>
+  <script src="/static/js/activateOTP.js"></script>
+</div>
+{{end}}

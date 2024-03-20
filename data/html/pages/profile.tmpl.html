@@ -17,7 +17,7 @@
       <div id="profilePictureContainer">
         <img class="clickable" id="profilePicture" src="/user/{{.Data.ID}}/picture?size=512">
         <input hidden type="file" name="profile_picture" id="profilePictureInput">
-        <label id="profilePictureSaveHint" class="hint-label invisible" for="profilePicture">{{translate .Lang "pressSaveToUpload"}}</label>
+        <label id="profilePictureSaveHint" class="hint-label invisible" for="profilePicture">{{translate .Lang "pressUpdateToUpload"}}</label>
         {{with .FieldErrors.ProfilePicture}}<label class="error-label" for="profilePicture">{{.}}</label>{{end}}
       </div>
 
@@ -29,7 +29,7 @@
       <input id="email" type="email" name="email" value="{{if .Form}}{{.Form.Email}}{{else}}{{.Data.Email}}{{end}}" required disabled>
     </div>
     <div class="submit-div">
-      <input class="btn" type="submit" value="{{translate .Lang "save"}}">
+      <input class="btn" type="submit" value="{{translate .Lang "update"}}">
     </div>
   </form>
 

@@ -104,9 +104,19 @@ func (h *Handler) auth(next http.Handler) http.Handler {
 			http.Redirect(w, r, fmt.Sprintf("/user/login?redirect=%s", url.QueryEscape(r.URL.RequestURI())), http.StatusSeeOther)
 			return
 		}
-
 		if !confirmed {
 			http.Redirect(w, r, fmt.Sprintf("/user/confirmEmail?redirect=%s", url.QueryEscape(r.URL.RequestURI())), http.StatusSeeOther)
+			return
+		}
+
+		otpActive, err := h.AuthService.IsOTPActive(r.Context(), userID)
+		if err != nil {
+			h.SessionManager.Destroy(r.Context())
+			http.Redirect(w, r, fmt.Sprintf("/user/login?redirect=%s", url.QueryEscape(r.URL.RequestURI())), http.StatusSeeOther)
+			return
+		}
+		if !otpActive {
+			http.Redirect(w, r, fmt.Sprintf("/user/2fa/otp/activate?redirect=%s", url.QueryEscape(r.URL.RequestURI())), http.StatusSeeOther)
 			return
 		}
 

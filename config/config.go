@@ -23,6 +23,18 @@ func AutoMigrate() (b bool) {
 	return b
 }
 
+func Local() (b bool) {
+	if c, ok := values["LOCAL"]; ok {
+		return c.(bool)
+	}
+	defer func() {
+		values["LOCAL"] = b
+	}()
+	str := os.Getenv("LOCAL")
+	b, _ = strconv.ParseBool(str)
+	return b
+}
+
 func Port() (port int) {
 	if p, ok := values["PORT"]; ok {
 		return p.(int)

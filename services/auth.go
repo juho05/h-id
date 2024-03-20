@@ -24,6 +24,8 @@ import (
 	"github.com/alexedwards/scs/v2"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/oklog/ulid/v2"
+	"github.com/pquerna/otp"
+	"github.com/pquerna/otp/totp"
 	"github.com/xdg-go/pbkdf2"
 
 	"github.com/juho05/log"
@@ -35,7 +37,8 @@ import (
 type AuthService interface {
 	PublicJWTKey() *rsa.PublicKey
 
-	Login(ctx context.Context, email, password string) error
+	Login(ctx context.Context, userID ulid.ULID) error
+	VerifyUsernamePassword(ctx context.Context, email, password string) (*repos.UserModel, error)
 	Logout(ctx context.Context) error
 	HashPassword(password string) ([]byte, error)
 	VerifyPassword(user *repos.UserModel, password string) error
@@ -45,6 +48,11 @@ type AuthService interface {
 	IsEmailConfirmed(ctx context.Context, id ulid.ULID) (bool, error)
 	SendConfirmEmail(r *http.Request, ctx context.Context, user *repos.UserModel) error
 	ConfirmEmail(ctx context.Context, userID ulid.ULID, code string) error
+
+	GenerateOTPKey(ctx context.Context, user *repos.UserModel) (*otp.Key, error)
+	ActivateOTPKey(ctx context.Context, userID ulid.ULID, code string) error
+	VerifyOTPCode(ctx context.Context, userID ulid.ULID, code string) error
+	IsOTPActive(ctx context.Context, id ulid.ULID) (bool, error)
 
 	StartOAuthCodeFlow(ctx context.Context, clientID ulid.ULID, redirectURI *url.URL, responseType, scope, state, nonce string) error
 	GetAuthRequest(ctx context.Context) (AuthRequest, error)
@@ -428,35 +436,110 @@ func (a *authService) IsEmailConfirmed(ctx context.Context, id ulid.ULID) (bool,
 	return user.EmailConfirmed, nil
 }
 
-func (a *authService) Login(ctx context.Context, email, password string) error {
-	user, err := a.userRepo.FindByEmail(ctx, email)
+func (a *authService) IsOTPActive(ctx context.Context, id ulid.ULID) (bool, error) {
+	authUser := a.AuthenticatedUserID(ctx)
+	if id == authUser && a.sessionManager.Exists(ctx, "otpActive") {
+		return a.sessionManager.GetBool(ctx, "otpActive"), nil
+	}
+	user, err := a.userRepo.Find(ctx, id)
+	if err != nil {
+		return false, fmt.Errorf("is otp active: %w", err)
+	}
+	if id == authUser {
+		a.sessionManager.Put(ctx, "otpActive", user.OTPActive)
+	}
+	return user.OTPActive, nil
+}
+
+func (a *authService) GenerateOTPKey(ctx context.Context, user *repos.UserModel) (*otp.Key, error) {
+	key, err := totp.Generate(totp.GenerateOpts{
+		Issuer:      "H-ID",
+		AccountName: user.Email,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("generate OTP key: %w", err)
+	}
+	err = a.userRepo.UpdateOTP(ctx, user.ID, false, key)
+	if err != nil {
+		return nil, fmt.Errorf("update user OTP key: %w", err)
+	}
+	err = a.sessionManager.RenewToken(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("generate OTP key: %w", err)
+	}
+	a.sessionManager.Remove(ctx, "otpActive")
+	return key, nil
+}
+
+func (a *authService) ActivateOTPKey(ctx context.Context, userID ulid.ULID, code string) error {
+	err := a.VerifyOTPCode(ctx, userID, code)
+	if err != nil {
+		return fmt.Errorf("activate OTP: %w", err)
+	}
+	err = a.userRepo.UpdateOTP(ctx, userID, true, nil)
+	if err != nil {
+		return fmt.Errorf("activate OTP: %w", err)
+	}
+	err = a.sessionManager.RenewToken(ctx)
+	if err != nil {
+		return fmt.Errorf("activate OTP: %w", err)
+	}
+	a.sessionManager.Remove(ctx, "otpActive")
+	return nil
+}
+
+func (a *authService) VerifyOTPCode(ctx context.Context, userID ulid.ULID, code string) error {
+	_, key, err := a.userRepo.GetOTP(ctx, userID)
 	if err != nil {
 		if errors.Is(err, repos.ErrNoRecord) {
 			return ErrInvalidCredentials
-		} else {
-			return fmt.Errorf("login: %w", err)
 		}
+		return fmt.Errorf("verify otp code: get otp: %w", err)
 	}
-
-	if err = bcrypt.CompareHashAndPassword(user.PasswordHash, []byte(password)); err != nil {
+	if key == nil {
+		return fmt.Errorf("verify otp code: %w", ErrInvalidCredentials)
+	}
+	if !totp.Validate(code, key.Secret()) {
 		return ErrInvalidCredentials
 	}
+	return nil
+}
 
+func (a *authService) VerifyUsernamePassword(ctx context.Context, email, password string) (*repos.UserModel, error) {
+	user, err := a.userRepo.FindByEmail(ctx, email)
+	if err != nil {
+		if errors.Is(err, repos.ErrNoRecord) {
+			return nil, ErrInvalidCredentials
+		} else {
+			return nil, fmt.Errorf("verify username/password: %w", err)
+		}
+	}
+	if err = bcrypt.CompareHashAndPassword(user.PasswordHash, []byte(password)); err != nil {
+		return nil, ErrInvalidCredentials
+	}
 	err = a.sessionManager.RenewToken(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("verify username/password: %w", err)
+	}
+	a.sessionManager.Put(ctx, "validPassword", user.ID)
+	return user, nil
+}
+
+func (a *authService) Login(ctx context.Context, userID ulid.ULID) error {
+	err := a.sessionManager.RenewToken(ctx)
 	if err != nil {
 		return fmt.Errorf("login: %w", err)
 	}
-
-	a.sessionManager.Put(ctx, "authUserID", user.ID)
+	a.sessionManager.Put(ctx, "authUserID", userID)
+	a.sessionManager.Remove(ctx, "validPassword")
 	return nil
 }
 
 func (a *authService) Logout(ctx context.Context) error {
-	err := a.sessionManager.RenewToken(ctx)
+	err := a.sessionManager.Destroy(ctx)
 	if err != nil {
 		return fmt.Errorf("logout: %w", err)
 	}
-	a.sessionManager.Remove(ctx, "authUserID")
 	return nil
 }
 

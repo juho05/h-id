@@ -62,12 +62,16 @@ func run() error {
 	handler.StaticFS = hid.StaticFS
 	handler.RegisterRoutes()
 
-	port := config.Port()
-
 	cert := config.TLSCert()
 	key := config.TLSKey()
 
-	addr := fmt.Sprintf(":%d", port)
+	var addr string
+	if config.Local() {
+		addr = fmt.Sprintf("localhost:%d", config.Port())
+	} else {
+		addr = fmt.Sprintf("0.0.0.0:%d", config.Port())
+	}
+
 	server := http.Server{
 		Addr:     addr,
 		Handler:  handler,
@@ -101,11 +105,11 @@ func run() error {
 		close(closed)
 	}()
 
-	log.Infof("Listening on %s...", addr)
-
 	if cert != "" && key != "" {
+		log.Infof("Listening on https://%s...", addr)
 		err = server.ListenAndServeTLS(cert, key)
 	} else {
+		log.Infof("Listening on http://%s...", addr)
 		err = server.ListenAndServe()
 	}
 	if errors.Is(err, http.ErrServerClosed) {

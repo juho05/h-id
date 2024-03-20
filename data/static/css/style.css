@@ -170,25 +170,25 @@ a {
   margin-top: 3%;
 }
 
-.form .input-label {
+.input-label {
   display: block;
   margin-top: 3%;
   margin-bottom: 1%;
 }
 
-.form .h-captcha {
+.h-captcha {
   margin-top: 3%;
   margin-bottom: -1%;
 }
 
-.form .error-label {
+.error-label {
   display: block;
   margin-top: 1%;
   font-size: 11pt;
   color: var(--error);
 }
 
-.form .hint-label {
+.hint-label {
   display: block;
   margin-top: 1%;
   font-size: 11pt;
@@ -226,6 +226,21 @@ input[type=email] {
 
 input:disabled {
   color: var(--foreground-dimmed);
+}
+
+#otp-secret {
+  display: block;
+  width: calc(100% - 16px);
+  padding: 8px;
+  margin-left: 0;
+  margin-right: 0;
+  background-color: var(--input-background);
+  color: var(--foreground);
+  border: 1px solid var(--input-border);
+  border-radius: 5px;
+  font-size: 16px;
+  line-height: 18px;
+  font-family: 'Roboto', sans-serif;
 }
 
 textarea {
@@ -281,14 +296,14 @@ select:focus {
   filter: brightness(0.90)
 }
 
-.form .submit-div {
+.submit-div {
   text-align: center;
   display: flex;
   justify-content: space-evenly;
 }
 
 
-.form .submit-div .btn {
+.submit-div .btn {
   width: 40%;
   padding: 10px 15px;
 }
@@ -296,6 +311,23 @@ select:focus {
 .consent-h3 {
   margin-top: 4%;
   margin-bottom: 3%;
+}
+
+#qr-code-container {
+  height: 27vh;
+  text-align: center;
+  margin-bottom: 1vh;
+  margin-top: 2vh;
+}
+
+#qr-code {
+  height: 100%;
+  width: 100%;
+  object-fit: contain;
+}
+
+#left-aligned {
+  text-align: left;
 }
 
 @font-face {

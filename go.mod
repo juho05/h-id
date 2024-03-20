@@ -18,6 +18,7 @@ require (
 	github.com/juho05/log v0.0.0-20230224211948-f9bad0acae34
 	github.com/justinas/nosurf v1.1.1
 	github.com/oklog/ulid/v2 v2.1.0
+	github.com/pquerna/otp v1.4.0
 	github.com/rubenv/sql-migrate v1.6.1
 	github.com/xdg-go/pbkdf2 v1.0.0
 	golang.org/x/crypto v0.21.0
@@ -26,6 +27,7 @@ require (
 )
 
 require (
+	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
 	github.com/go-gorp/gorp/v3 v3.1.0 // indirect

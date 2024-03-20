@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/oklog/ulid/v2"
+	"github.com/pquerna/otp"
 
 	"github.com/juho05/h-id/repos"
 	"github.com/juho05/h-id/repos/sqlite/db"
@@ -28,6 +29,14 @@ func repoUser(user db.User) (*repos.UserModel, error) {
 	if err != nil {
 		return nil, err
 	}
+	otpKey, err := otp.NewKeyFromURL(user.OtpUrl)
+	if err != nil {
+		if user.OtpUrl == "" {
+			otpKey = nil
+		} else {
+			return nil, fmt.Errorf("convert otp url in db to otp key: %w", err)
+		}
+	}
 	return &repos.UserModel{
 		BaseModel: repos.BaseModel{
 			ID:        id,
@@ -37,6 +46,8 @@ func repoUser(user db.User) (*repos.UserModel, error) {
 		Email:          user.Email,
 		EmailConfirmed: user.EmailConfirmed,
 		PasswordHash:   user.PasswordHash,
+		OTPActive:      user.OtpActive,
+		OTPKey:         otpKey,
 	}, nil
 }
 
@@ -67,6 +78,25 @@ func (u *userRepository) GetPasswordHash(ctx context.Context, userID ulid.ULID) 
 	return hash, nil
 }
 
+func (u *userRepository) GetOTP(ctx context.Context, userID ulid.ULID) (active bool, key *otp.Key, err error) {
+	res, err := u.db.GetOTP(ctx, userID.String())
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			err = repos.ErrNoRecord
+		}
+		return false, nil, fmt.Errorf("get otp: %w", err)
+	}
+	otpKey, err := otp.NewKeyFromURL(res.OtpUrl)
+	if err != nil {
+		if res.OtpUrl == "" {
+			otpKey = nil
+		} else {
+			return false, nil, fmt.Errorf("convert otp url in db to otp key: %w", err)
+		}
+	}
+	return res.OtpActive, otpKey, nil
+}
+
 func (u *userRepository) Create(ctx context.Context, name, email string, passwordHash []byte) (*repos.UserModel, error) {
 	user, err := u.db.CreateUser(ctx, db.CreateUserParams{
 		ID:             ulid.Make().String(),
@@ -75,6 +105,8 @@ func (u *userRepository) Create(ctx context.Context, name, email string, passwor
 		Email:          email,
 		EmailConfirmed: false,
 		PasswordHash:   passwordHash,
+		OtpActive:      false,
+		OtpUrl:         "",
 	})
 	if err != nil {
 		return nil, repoErr("create user name: %w", err)
@@ -96,6 +128,28 @@ func (u *userRepository) UpdateEmailConfirmed(ctx context.Context, id ulid.ULID,
 		EmailConfirmed: confirmed,
 	})
 	return repoErrResult("update user email confirmed: %w", result, err)
+}
+
+func (u *userRepository) UpdateOTP(ctx context.Context, id ulid.ULID, active bool, otpKey *otp.Key) error {
+	var result sql.Result
+	var err error
+	if otpKey != nil || !active {
+		var otpURL string
+		if otpKey != nil {
+			otpURL = otpKey.URL()
+		}
+		result, err = u.db.UpdateOTP(ctx, db.UpdateOTPParams{
+			ID:        id.String(),
+			OtpActive: active,
+			OtpUrl:    otpURL,
+		})
+	} else {
+		result, err = u.db.SetOTPActive(ctx, db.SetOTPActiveParams{
+			ID:        id.String(),
+			OtpActive: active,
+		})
+	}
+	return repoErrResult("update otp: %w", result, err)
 }
 
 func (u *userRepository) Delete(ctx context.Context, id ulid.ULID) error {
