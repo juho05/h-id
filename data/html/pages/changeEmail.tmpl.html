@@ -1,4 +1,4 @@
-{{define "title"}}{{translate .Lang "profile"}}{{end}}
+{{define "title"}}{{translate .Lang "changeEmail"}}{{end}}
 
 {{define "main"}}
 <div class="form-panel">
@@ -15,7 +15,7 @@
       <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 
       <label class="input-label" for="email">{{translate .Lang "newEmail"}}:</label>
-      <input class="{{if .FieldErrors.NewEmail}}invalid-field{{end}}" id="email" type="email" name="email" {{with .Form}}{{if .NewEmail}}value="{{.NewEmail}}"{{else}}autofocus{{end}}{{end}} required>
+      <input class="{{if .FieldErrors.NewEmail}}invalid-field{{end}}" id="email" type="email" name="email" {{with .Form}}{{if .NewEmail}}value="{{.NewEmail}}"{{else}}autofocus{{end}}{{else}}autofocus{{end}} required>
       {{with .FieldErrors.NewEmail}}<label class="error-label" for="email">{{.}}</label>{{end}}
 
       <label class="input-label" for="password">{{translate .Lang "password"}}:</label>

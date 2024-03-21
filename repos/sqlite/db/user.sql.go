@@ -242,6 +242,19 @@ func (q *Queries) UpdateOTP(ctx context.Context, arg UpdateOTPParams) (sql.Resul
 	return q.db.ExecContext(ctx, updateOTP, arg.OtpActive, arg.OtpUrl, arg.ID)
 }
 
+const updatePassword = `-- name: UpdatePassword :execresult
+UPDATE users SET password_hash = ? WHERE id = ?
+`
+
+type UpdatePasswordParams struct {
+	PasswordHash []byte
+	ID           string
+}
+
+func (q *Queries) UpdatePassword(ctx context.Context, arg UpdatePasswordParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, updatePassword, arg.PasswordHash, arg.ID)
+}
+
 const updateUserName = `-- name: UpdateUserName :execresult
 UPDATE users SET name = ? WHERE id = ?
 `

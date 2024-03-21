@@ -364,6 +364,11 @@ select:focus {
   text-align: left;
 }
 
+#forgotPasswordPanel .hint-label-success {
+  margin-top: 2vh;
+  margin-bottom: -1.5vh;
+}
+
 @font-face {
   font-family: 'Roboto';
   src: url('/static/fonts/Roboto-Regular.ttf');

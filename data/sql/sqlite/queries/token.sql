@@ -6,5 +6,7 @@ REPLACE INTO tokens (
 ) RETURNING *;
 -- name: FindToken :one
 SELECT * FROM tokens WHERE category = ? AND token_key = ? AND expires > sqlc.arg(now);
+-- name: FindTokenByValue :one
+SELECT * FROM tokens WHERE category = ? AND value_hash = ? AND expires > sqlc.arg(now);
 -- name: DeleteToken :execresult
 DELETE FROM tokens WHERE (category = ? AND token_key = ?) OR expires < sqlc.arg(now);

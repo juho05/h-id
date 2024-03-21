@@ -136,6 +136,14 @@ func (u *userRepository) UpdateName(ctx context.Context, id ulid.ULID, name stri
 	return repoErrResult("update user: %w", result, err)
 }
 
+func (u *userRepository) UpdatePassword(ctx context.Context, id ulid.ULID, passwordHash []byte) error {
+	result, err := u.db.UpdatePassword(ctx, db.UpdatePasswordParams{
+		ID:           id.String(),
+		PasswordHash: passwordHash,
+	})
+	return repoErrResult("update user password: %w", result, err)
+}
+
 func (u *userRepository) UpdateEmailConfirmed(ctx context.Context, id ulid.ULID, confirmed bool) error {
 	result, err := u.db.UpdateEmailConfirmed(ctx, db.UpdateEmailConfirmedParams{
 		ID:             id.String(),

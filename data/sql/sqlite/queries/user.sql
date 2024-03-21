@@ -16,6 +16,8 @@ INSERT INTO users (
 ) RETURNING *;
 -- name: UpdateUserName :execresult
 UPDATE users SET name = ? WHERE id = ?;
+-- name: UpdatePassword :execresult
+UPDATE users SET password_hash = ? WHERE id = ?;
 -- name: UpdateEmailConfirmed :execresult
 UPDATE users SET email_confirmed = ? WHERE id = ?;
 -- name: UpdateOTP :execresult

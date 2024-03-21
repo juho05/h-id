@@ -22,6 +22,7 @@
       <input class="{{if .FieldErrors.Password}}invalid-field{{end}}" id="password" type="password" name="password" required {{if .Form.Email}}autofocus{{end}}>
       {{with .FieldErrors.Password}}<label class="error-label" for="password">{{.}}</label>{{end}}
 
+      <a class="input-label" href="/user/forgotPassword">{{translate .Lang "forgotPasswordLink"}}</a>
       <a class="input-label" href="/user/signup">{{translate .Lang "createAccount"}}</a>
     </div>
     <div class="submit-div">

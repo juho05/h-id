@@ -48,6 +48,9 @@ type AuthService interface {
 	IsEmailConfirmed(ctx context.Context, id ulid.ULID) (bool, error)
 	SendConfirmEmail(r *http.Request, ctx context.Context, user *repos.UserModel) error
 	ConfirmEmail(ctx context.Context, userID ulid.ULID, code string) error
+	RequestForgotPassword(ctx context.Context, lang, email string) error
+	ResetPassword(ctx context.Context, token, newPassword string) error
+	UpdatePassword(ctx context.Context, userID ulid.ULID, password string) error
 
 	GenerateOTPKey(ctx context.Context, user *repos.UserModel) (*otp.Key, error)
 	ActivateOTPKey(ctx context.Context, userID ulid.ULID, code string) error
@@ -403,6 +406,65 @@ func (a *authService) ConfirmEmail(ctx context.Context, userID ulid.ULID, code s
 
 	a.sessionManager.Remove(ctx, "emailConfirmed")
 	return nil
+}
+
+func (a *authService) RequestForgotPassword(ctx context.Context, lang, email string) error {
+	if token, err := a.tokenRepo.Find(ctx, repos.TokenForgotPassword, email); err == nil && time.Since(token.CreatedAt) < 2*time.Minute {
+		return ErrTimeout
+	} else if err != nil && !errors.Is(err, repos.ErrNoRecord) {
+		return fmt.Errorf("check forgot password timeout: %w", err)
+	}
+	token := generateToken(64)
+	tokenHash := hashToken(token)
+
+	_, err := a.tokenRepo.Create(ctx, repos.TokenForgotPassword, email, tokenHash, 2*time.Minute)
+	if err != nil {
+		return fmt.Errorf("create forgot password token: %w", err)
+	}
+
+	go func() {
+		user, err := a.userRepo.FindByEmail(ctx, email)
+		if err != nil {
+			return
+		}
+		data := newEmailTemplateData(user.Name, lang)
+		data.Code = token
+		err = a.emailService.SendEmail(user.Email, MustTranslate(lang, "forgotPassword"), "forgotPassword", data)
+		if err != nil {
+			log.Errorf("Failed to send email: %s", err)
+		}
+	}()
+	return nil
+}
+
+func (a *authService) ResetPassword(ctx context.Context, token, newPassword string) error {
+	t, err := a.tokenRepo.FindByValue(ctx, repos.TokenForgotPassword, hashToken(token))
+	if err != nil {
+		if errors.Is(err, repos.ErrNoRecord) {
+			err = ErrInvalidCredentials
+		}
+		return err
+	}
+	err = a.tokenRepo.Delete(ctx, t.Category, t.Key)
+	if err != nil {
+		return fmt.Errorf("reset password: %w", err)
+	}
+	user, err := a.userRepo.FindByEmail(ctx, t.Key)
+	if err != nil {
+		if errors.Is(err, repos.ErrNoRecord) {
+			err = ErrInvalidCredentials
+		}
+		return err
+	}
+	return a.UpdatePassword(ctx, user.ID, newPassword)
+}
+
+func (a *authService) UpdatePassword(ctx context.Context, userID ulid.ULID, password string) error {
+	passwordHash, err := a.HashPassword(password)
+	if err != nil {
+		return fmt.Errorf("update password: %w", err)
+	}
+	return a.userRepo.UpdatePassword(ctx, userID, passwordHash)
 }
 
 func (a *authService) AuthenticatedUserID(ctx context.Context) ulid.ULID {

@@ -8,6 +8,7 @@ import (
 
 var translations = map[string]map[string]string{
 	"en": {
+		"submit":                    "Submit",
 		"login":                     "Login",
 		"signup":                    "Sign up",
 		"logout":                    "Logout",
@@ -63,8 +64,17 @@ var translations = map[string]map[string]string{
 		"emailChanged":              "Email Changed",
 		"unexpectedEmailChange":     "You didn't change your email address for H-ID?",
 		"emailChangedTo":            "Your email address has been changed to:",
+		"forgotPassword":            "Forgot Password",
+		"forgotPasswordLink":        "Forgot password",
+		"resetLinkRequested":        "If this email address belongs to an account, a password reset link was sent to it.",
+		"forgotPasswordTimeout":     "You have already requested a password reset link to this email address.",
+		"toResetPasswordClick":      "To reset your password click",
+		"resetPassword":             "Reset Password",
+		"newPassword":               "New password",
+		"expiredPasswordResetToken": "Expired reset token.",
 	},
 	"de": {
+		"submit":                    "Submit",
 		"login":                     "Anmelden",
 		"signup":                    "Registrieren",
 		"logout":                    "Abmelden",
@@ -120,6 +130,14 @@ var translations = map[string]map[string]string{
 		"emailChanged":              "Email Änderung",
 		"unexpectedEmailChange":     "Du hast deine Email-Adresse bei H-ID nicht geändert?",
 		"emailChangedTo":            "Deine Email-Adresse wurde geändert zu:",
+		"forgotPassword":            "Passwort Vergessen",
+		"forgotPasswordLink":        "Passwort vergessen",
+		"resetLinkRequested":        "Falls diese Email-Adresse bei uns im System registriert ist, wurde ein Link zum Zurücksetzen des Passworts an sie gesendet.",
+		"forgotPasswordTimeout":     "Du hast bereits einen Zurücksetzungslink an diese Adresse angefragt.",
+		"toResetPasswordClick":      "Um dein Passwort zurückzusetzen, klick",
+		"resetPassword":             "Passwort Zurücksetzen",
+		"newPassword":               "Neues Passwort",
+		"expiredPasswordResetToken": "Abgelaufenes Zurücksetzungstoken.",
 	},
 }
 

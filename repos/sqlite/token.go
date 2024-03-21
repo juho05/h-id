@@ -51,6 +51,18 @@ func (t *tokenRepository) Find(ctx context.Context, category repos.TokenCategory
 	return repoToken(token), nil
 }
 
+func (t *tokenRepository) FindByValue(ctx context.Context, category repos.TokenCategory, valueHash []byte) (*repos.TokenModel, error) {
+	token, err := t.db.FindTokenByValue(ctx, db.FindTokenByValueParams{
+		Category:  string(category),
+		ValueHash: valueHash,
+		Now:       time.Now().Unix(),
+	})
+	if err != nil {
+		return nil, repoErr("find token by value hash: %w", err)
+	}
+	return repoToken(token), nil
+}
+
 func (t *tokenRepository) Delete(ctx context.Context, category repos.TokenCategory, key string) error {
 	result, err := t.db.DeleteToken(ctx, db.DeleteTokenParams{
 		Category: string(category),

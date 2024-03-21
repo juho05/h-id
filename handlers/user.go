@@ -34,6 +34,10 @@ func (h *Handler) userRoutes(r chi.Router) {
 	r.With(h.noauth).Post("/signup", h.userSignUp)
 	r.With(h.noauth).Get("/login", h.userLoginPage)
 	r.With(h.noauth).Post("/login", h.userLogin)
+	r.With(h.noauth).Get("/forgotPassword", h.forgotPasswordPage)
+	r.With(h.noauth).Post("/forgotPassword", h.forgotPassword)
+	r.With(h.noauth).Get("/resetPassword", h.resetPasswordPage)
+	r.With(h.noauth).Post("/resetPassword", h.resetPassword)
 	r.With(h.auth).Post("/logout", h.userLogout)
 
 	r.With(h.auth).Get("/confirmEmail", h.userConfirmEmailPage)
@@ -177,6 +181,100 @@ func (h *Handler) userLogin(w http.ResponseWriter, r *http.Request) {
 	} else {
 		http.Redirect(w, r, "/user/2fa/otp/verify", http.StatusSeeOther)
 	}
+}
+
+// GET /user/forgotPassword
+func (h *Handler) forgotPasswordPage(w http.ResponseWriter, r *http.Request) {
+	lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
+	success := h.SessionManager.PopString(r.Context(), "forgotPasswordSuccess")
+	success, _ = services.Translate(lang, success)
+	erro := h.SessionManager.PopString(r.Context(), "forgotPasswordError")
+	erro, _ = services.Translate(lang, erro)
+	if config.HCaptchaSiteKey() != "" {
+		w.Header().Set("Cross-Origin-Embedder-Policy", "unsafe-none")
+	}
+	type data struct {
+		Success string
+	}
+	tmplData := h.newTemplateDataWithData(r, data{
+		Success: success,
+	})
+	if erro != "" {
+		tmplData.Errors = append(tmplData.Errors, erro)
+	}
+	h.Renderer.render(w, r, http.StatusOK, "forgotPassword", tmplData)
+}
+
+// POST /user/forgotPassword
+func (h *Handler) forgotPassword(w http.ResponseWriter, r *http.Request) {
+	type request struct {
+		Email string `form:"email" validate:"required,email"`
+	}
+	body, ok := decodeAndValidateBodyWithCaptcha[request](h, w, r, "forgotPassword", nil)
+	if !ok {
+		return
+	}
+
+	if config.HCaptchaSiteKey() != "" {
+		w.Header().Set("Cross-Origin-Embedder-Policy", "unsafe-none")
+	}
+
+	lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
+	err := h.AuthService.RequestForgotPassword(r.Context(), lang, body.Email)
+	if err != nil {
+		if errors.Is(err, services.ErrTimeout) {
+			h.SessionManager.Put(r.Context(), "forgotPasswordError", "forgotPasswordTimeout")
+			http.Redirect(w, r, "/user/forgotPassword", http.StatusSeeOther)
+		} else {
+			serverError(w, err)
+		}
+		return
+	}
+	h.SessionManager.Put(r.Context(), "forgotPasswordSuccess", "resetLinkRequested")
+	http.Redirect(w, r, "/user/forgotPassword", http.StatusSeeOther)
+}
+
+// GET /user/resetPassword
+func (h *Handler) resetPasswordPage(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("token")
+	type data struct {
+		Token string
+	}
+	tmplData := h.newTemplateData(r)
+	tmplData.Form = data{
+		Token: token,
+	}
+	h.Renderer.render(w, r, http.StatusOK, "resetPassword", tmplData)
+}
+
+// POST /user/resetPassword
+func (h *Handler) resetPassword(w http.ResponseWriter, r *http.Request) {
+	type request struct {
+		Token          string `form:"token" validate:"required"`
+		Password       string `form:"password" validate:"required,min=6,maxsize=72"`
+		RepeatPassword string `form:"repeatPassword" validate:"required,eqfield=Password"`
+	}
+	body, ok := decodeAndValidateBody[request](h, w, r, "resetPassword", nil)
+	if !ok {
+		return
+	}
+
+	err := h.AuthService.ResetPassword(r.Context(), body.Token, body.Password)
+	if err != nil {
+		if errors.Is(err, services.ErrInvalidCredentials) {
+			lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
+			data := h.newTemplateData(r)
+			e, _ := services.Translate(lang, "expiredPasswordResetToken")
+			data.Errors = []string{e}
+			data.Form = body
+			h.Renderer.render(w, r, http.StatusUnauthorized, "resetPassword", data)
+		} else {
+			serverError(w, err)
+		}
+		return
+	}
+
+	http.Redirect(w, r, "/user/login", http.StatusSeeOther)
 }
 
 func (h *Handler) verifyOTPPage(w http.ResponseWriter, r *http.Request) {

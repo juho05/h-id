@@ -26,6 +26,7 @@ type UserRepository interface {
 	GetOTP(ctx context.Context, userID ulid.ULID) (active bool, key *otp.Key, err error)
 	Create(ctx context.Context, name, email string, passwordHash []byte) (*UserModel, error)
 	UpdateName(ctx context.Context, id ulid.ULID, name string) error
+	UpdatePassword(ctx context.Context, id ulid.ULID, passwordHash []byte) error
 	UpdateEmailConfirmed(ctx context.Context, id ulid.ULID, confirmed bool) error
 	UpdateOTP(ctx context.Context, id ulid.ULID, active bool, otpKey *otp.Key) error
 	CreateChangeEmailRequest(ctx context.Context, userID ulid.ULID, newEmail string, tokenHash []byte, lifetime time.Duration) error

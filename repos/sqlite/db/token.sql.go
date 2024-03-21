@@ -81,3 +81,26 @@ func (q *Queries) FindToken(ctx context.Context, arg FindTokenParams) (Token, er
 	)
 	return i, err
 }
+
+const findTokenByValue = `-- name: FindTokenByValue :one
+SELECT created_at, category, token_key, value_hash, expires FROM tokens WHERE category = ? AND value_hash = ? AND expires > ?3
+`
+
+type FindTokenByValueParams struct {
+	Category  string
+	ValueHash []byte
+	Now       int64
+}
+
+func (q *Queries) FindTokenByValue(ctx context.Context, arg FindTokenByValueParams) (Token, error) {
+	row := q.db.QueryRowContext(ctx, findTokenByValue, arg.Category, arg.ValueHash, arg.Now)
+	var i Token
+	err := row.Scan(
+		&i.CreatedAt,
+		&i.Category,
+		&i.TokenKey,
+		&i.ValueHash,
+		&i.Expires,
+	)
+	return i, err
+}

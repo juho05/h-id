@@ -7,7 +7,10 @@ import (
 
 type TokenCategory string
 
-var TokenConfirmEmail TokenCategory = "confirm-email"
+var (
+	TokenConfirmEmail   TokenCategory = "confirm-email"
+	TokenForgotPassword TokenCategory = "forgot-password"
+)
 
 type TokenModel struct {
 	CreatedAt time.Time
@@ -20,5 +23,6 @@ type TokenModel struct {
 type TokenRepository interface {
 	Create(ctx context.Context, category TokenCategory, key string, valueHash []byte, lifetime time.Duration) (*TokenModel, error)
 	Find(ctx context.Context, category TokenCategory, key string) (*TokenModel, error)
+	FindByValue(ctx context.Context, category TokenCategory, valueHash []byte) (*TokenModel, error)
 	Delete(ctx context.Context, category TokenCategory, key string) error
 }
