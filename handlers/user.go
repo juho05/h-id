@@ -552,10 +552,11 @@ func (h *Handler) changeEmail(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cross-Origin-Embedder-Policy", "unsafe-none")
 	}
 
+	lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
 	tmplData := h.newTemplateData(r)
 	tmplData.Form = body
 	if body.NewEmail == user.Email {
-		tmplData.FieldErrors["NewEmail"] = "Your new email address must be different from your old one."
+		tmplData.FieldErrors["NewEmail"] = services.MustTranslate(lang, "newEmailSameAsOld")
 		h.Renderer.render(w, r, http.StatusUnprocessableEntity, "changeEmail", tmplData)
 		return
 	}
@@ -563,7 +564,7 @@ func (h *Handler) changeEmail(w http.ResponseWriter, r *http.Request) {
 	err = h.AuthService.VerifyPasswordByID(r.Context(), user.ID, body.Password)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidCredentials) {
-			tmplData.FieldErrors["Password"] = "Wrong password."
+			tmplData.FieldErrors["Password"] = services.MustTranslate(lang, "wrongPassword")
 			h.Renderer.render(w, r, http.StatusUnprocessableEntity, "changeEmail", tmplData)
 		} else {
 			serverError(w, err)
@@ -573,7 +574,7 @@ func (h *Handler) changeEmail(w http.ResponseWriter, r *http.Request) {
 
 	_, err = h.UserService.FindByEmail(r.Context(), body.NewEmail)
 	if err == nil {
-		tmplData.FieldErrors["NewEmail"] = "This email address is already in use by another account."
+		tmplData.FieldErrors["NewEmail"] = services.MustTranslate(lang, "emailAlreadyInUse")
 		h.Renderer.render(w, r, http.StatusUnprocessableEntity, "changeEmail", tmplData)
 		return
 	}
@@ -582,7 +583,6 @@ func (h *Handler) changeEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
 	err = h.UserService.RequestChangeEmail(r.Context(), lang, user, body.NewEmail)
 	if err != nil {
 		serverError(w, err)
@@ -700,17 +700,17 @@ func (h *Handler) updateUserProfile(w http.ResponseWriter, r *http.Request) {
 		Name:  body.Name,
 		Email: user.Email,
 	}
-
+	lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
 	if pictureFile, pictureHeader, err := r.FormFile("profile_picture"); err == nil {
 		if pictureHeader.Size > 10<<20 { // 10 MB
-			tmplData.FieldErrors["ProfilePicture"] = "Profile picture size must not exceed 10 MB"
+			tmplData.FieldErrors["ProfilePicture"] = services.MustTranslate(lang, "profilePictureTooLarge")
 			h.Renderer.render(w, r, http.StatusUnprocessableEntity, "profile", tmplData)
 			return
 		}
 
 		mimeType, _, err := mime.ParseMediaType(pictureHeader.Header.Get("Content-Type"))
 		if err != nil || (mimeType != "image/jpeg" && mimeType != "image/png" && mimeType != "image/gif") {
-			tmplData.FieldErrors["ProfilePicture"] = "Profile picture must be in JPEG, PNG or GIF format"
+			tmplData.FieldErrors["ProfilePicture"] = services.MustTranslate(lang, "profilePictureWrongFormat")
 			h.Renderer.render(w, r, http.StatusUnprocessableEntity, "profile", tmplData)
 			return
 		}
