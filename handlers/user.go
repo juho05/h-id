@@ -30,26 +30,28 @@ func (h *Handler) userRoutes(r chi.Router) {
 			next.ServeHTTP(w, r)
 		})
 	})
-	r.Get("/signup", h.userSignUpPage)
-	r.Post("/signup", h.userSignUp)
-	r.Get("/login", h.userLoginPage)
-	r.Post("/login", h.userLogin)
+	r.With(h.noauth).Get("/signup", h.userSignUpPage)
+	r.With(h.noauth).Post("/signup", h.userSignUp)
+	r.With(h.noauth).Get("/login", h.userLoginPage)
+	r.With(h.noauth).Post("/login", h.userLogin)
 	r.With(h.auth).Post("/logout", h.userLogout)
 
-	r.Get("/confirmEmail", h.userConfirmEmailPage)
-	r.Post("/confirmEmail", h.userConfirmEmail)
+	r.With(h.auth).Get("/confirmEmail", h.userConfirmEmailPage)
+	r.With(h.auth).Post("/confirmEmail", h.userConfirmEmail)
 
 	r.Get("/2fa/otp/activate", h.userActivateOTPPage)
 	r.Post("/2fa/otp/activate", h.userActivateOTP)
 	r.Get("/2fa/otp/activate/qr", h.userActivateOTPQRCode)
 
-	r.Get("/2fa/otp/verify", h.verifyOTPPage)
-	r.Post("/2fa/otp/verify", h.verifyOTP)
+	r.With(h.noauth).Get("/2fa/otp/verify", h.verifyOTPPage)
+	r.With(h.noauth).Post("/2fa/otp/verify", h.verifyOTP)
 
 	r.With(corsHeaders).Get("/{id}/picture", h.profilePicture)
 	r.With(corsHeaders, h.oauth()).HandleFunc("/info", h.userInfo)
 
-	r.With(h.auth).Get("/changeEmail", h.changeEmail)
+	r.With(h.auth).Get("/changeEmail", h.changeEmailPage)
+	r.With(h.auth).Post("/changeEmail", h.changeEmail)
+	r.With(h.auth).Get("/updateEmail", h.updateEmail)
 	r.With(h.auth).Get("/profile", h.userProfile)
 	r.With(h.auth).Post("/profile", h.updateUserProfile)
 }
@@ -522,7 +524,76 @@ func (h *Handler) userActivateOTPQRCode(w http.ResponseWriter, r *http.Request) 
 }
 
 // GET /user/changeEmail
+func (h *Handler) changeEmailPage(w http.ResponseWriter, r *http.Request) {
+	if config.HCaptchaSiteKey() != "" {
+		w.Header().Set("Cross-Origin-Embedder-Policy", "unsafe-none")
+	}
+	h.Renderer.render(w, r, http.StatusOK, "changeEmail", h.newTemplateData(r))
+}
+
+// POST /user/changeEmail
 func (h *Handler) changeEmail(w http.ResponseWriter, r *http.Request) {
+	user, err := h.UserService.Find(r.Context(), h.AuthService.AuthenticatedUserID(r.Context()))
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+
+	type request struct {
+		NewEmail string `form:"email" validate:"required,email"`
+		Password string `form:"password" validate:"required"`
+	}
+	body, ok := decodeAndValidateBodyWithCaptcha[request](h, w, r, "changeEmail", nil)
+	if !ok {
+		return
+	}
+
+	if config.HCaptchaSiteKey() != "" {
+		w.Header().Set("Cross-Origin-Embedder-Policy", "unsafe-none")
+	}
+
+	tmplData := h.newTemplateData(r)
+	tmplData.Form = body
+	if body.NewEmail == user.Email {
+		tmplData.FieldErrors["NewEmail"] = "Your new email address must be different from your old one."
+		h.Renderer.render(w, r, http.StatusUnprocessableEntity, "changeEmail", tmplData)
+		return
+	}
+
+	err = h.AuthService.VerifyPasswordByID(r.Context(), user.ID, body.Password)
+	if err != nil {
+		if errors.Is(err, services.ErrInvalidCredentials) {
+			tmplData.FieldErrors["Password"] = "Wrong password."
+			h.Renderer.render(w, r, http.StatusUnprocessableEntity, "changeEmail", tmplData)
+		} else {
+			serverError(w, err)
+		}
+		return
+	}
+
+	_, err = h.UserService.FindByEmail(r.Context(), body.NewEmail)
+	if err == nil {
+		tmplData.FieldErrors["NewEmail"] = "This email address is already in use by another account."
+		h.Renderer.render(w, r, http.StatusUnprocessableEntity, "changeEmail", tmplData)
+		return
+	}
+	if !errors.Is(err, repos.ErrNoRecord) {
+		serverError(w, err)
+		return
+	}
+
+	lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
+	err = h.UserService.RequestChangeEmail(r.Context(), lang, user, body.NewEmail)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	h.SessionManager.Put(r.Context(), "profilePageSuccess", "emailChangeRequested")
+	http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+}
+
+// GET /user/updateEmail
+func (h *Handler) updateEmail(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
 	if token == "" {
 		clientError(w, http.StatusBadRequest)
@@ -600,8 +671,7 @@ func (h *Handler) updateUserProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type request struct {
-		Name  string `form:"name" validate:"required,notblank,min=3,max=32"`
-		Email string `form:"email" validate:"required,email"`
+		Name string `form:"name" validate:"required,notblank,min=3,max=32"`
 	}
 	type userDTO struct {
 		ID    ulid.ULID
@@ -618,17 +688,17 @@ func (h *Handler) updateUserProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body.Name = strings.TrimSpace(body.Name)
-	body.Email = strings.TrimSpace(body.Email)
-	tmplData.Data = userDTO{
-		ID:    user.ID,
-		Name:  body.Name,
-		Email: body.Email,
-	}
 
 	err = h.UserService.Update(r.Context(), h.AuthService.AuthenticatedUserID(r.Context()), body.Name)
 	if err != nil {
 		serverError(w, err)
 		return
+	}
+
+	tmplData.Data = userDTO{
+		ID:    user.ID,
+		Name:  body.Name,
+		Email: user.Email,
 	}
 
 	if pictureFile, pictureHeader, err := r.FormFile("profile_picture"); err == nil {
@@ -656,17 +726,6 @@ func (h *Handler) updateUserProfile(w http.ResponseWriter, r *http.Request) {
 			serverError(w, err)
 			return
 		}
-	}
-
-	lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
-	if body.Email != user.Email {
-		user.Name = body.Name
-		err = h.UserService.RequestChangeEmail(r.Context(), lang, user, body.Email)
-		if err != nil {
-			serverError(w, err)
-			return
-		}
-		h.SessionManager.Put(r.Context(), "profilePageSuccess", "emailChangeRequested")
 	}
 
 	http.Redirect(w, r, "/user/profile", http.StatusSeeOther)

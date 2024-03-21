@@ -32,7 +32,7 @@
       {{with .FieldErrors.Name}}<label class="error-label" for="name">{{.}}</label>{{end}}
 
       <label class="input-label" for="email">{{translate .Lang "email"}}:</label>
-      <input id="email" type="email" name="email" value="{{if .Form}}{{.Form.Email}}{{else}}{{.Data.Email}}{{end}}" required>
+      <a href="/user/changeEmail" id="email" class="clickable">{{.Data.Email}}</a>
     </div>
     <div class="submit-div">
       <input class="btn" type="submit" value="{{translate .Lang "update"}}">

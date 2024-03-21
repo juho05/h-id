@@ -1,0 +1,37 @@
+{{define "title"}}{{translate .Lang "profile"}}{{end}}
+
+{{define "main"}}
+<div class="form-panel">
+  <h2 class="form-title">{{translate .Lang "changeEmail"}}</h2>
+  {{with .Errors}}
+  <ul class="error-list">
+    {{range .}}
+    <li>{{.}}</li>
+    {{end}}
+  </ul>
+  {{end}}
+  <form class="form" action="/user/changeEmail" method="POST">
+    <div>
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+      <label class="input-label" for="email">{{translate .Lang "newEmail"}}:</label>
+      <input class="{{if .FieldErrors.NewEmail}}invalid-field{{end}}" id="email" type="email" name="email" {{with .Form}}{{if .NewEmail}}value="{{.NewEmail}}"{{else}}autofocus{{end}}{{end}} required>
+      {{with .FieldErrors.NewEmail}}<label class="error-label" for="email">{{.}}</label>{{end}}
+
+      <label class="input-label" for="password">{{translate .Lang "password"}}:</label>
+      <input class="{{if .FieldErrors.Password}}invalid-field{{end}}" id="password" type="password" name="password" required {{with .Form}}{{if .NewEmail}}autofocus{{end}}{{end}}>
+      {{with .FieldErrors.Password}}<label class="error-label" for="password">{{.}}</label>{{end}}
+
+      {{if .SiteKey}}
+      <div id="h-captcha" class="h-captcha" data-sitekey="{{.SiteKey}}"></div>
+      <script src="/static/js/captcha.js"></script>
+      <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
+      {{with .FieldErrors.Captcha}}<label class="error-label">{{.}}</label>{{end}}
+      {{end}}
+    </div>
+    <div class="submit-div">
+      <input class="btn" type="submit" value="{{translate .Lang "update"}}">
+    </div>
+  </form>
+</div>
+{{end}}

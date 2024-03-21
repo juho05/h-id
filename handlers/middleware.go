@@ -90,6 +90,17 @@ func csrf(next http.Handler) http.Handler {
 	return handler
 }
 
+func (h *Handler) noauth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, ok := h.SessionManager.Get(r.Context(), "authUserID").(ulid.ULID)
+		if ok {
+			http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (h *Handler) auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := h.SessionManager.Get(r.Context(), "authUserID").(ulid.ULID)

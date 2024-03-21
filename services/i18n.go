@@ -54,6 +54,7 @@ var translations = map[string]map[string]string{
 		"emailChangeSuccess":       "Your email address has been successfully updated.",
 		"emailChangeFailure":       "Your email address wasn't updated. Has your link expired?",
 		"emailChangeFailureExists": "Your email address wasn't updated because the new address is already in use by another account.",
+		"newEmail":                 "New email address",
 	},
 	"de": {
 		"login":                    "Anmelden",
@@ -102,6 +103,7 @@ var translations = map[string]map[string]string{
 		"emailChangeSuccess":       "Deine Email-Adresse wurde erfolgreich aktualisiert.",
 		"emailChangeFailure":       "Deine Email-Adresse wurde nicht aktualisiert. Ist dein Link abgelaufen?",
 		"emailChangeFailureExists": "Deine Email-Adresse wurde nicht aktualisiert, weil die neue Adresse bereits für ein anderes Konto verwendet wird.",
+		"newEmail":                 "Neue Email-Adresse",
 	},
 }
 
