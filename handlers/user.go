@@ -49,6 +49,7 @@ func (h *Handler) userRoutes(r chi.Router) {
 	r.With(corsHeaders).Get("/{id}/picture", h.profilePicture)
 	r.With(corsHeaders, h.oauth()).HandleFunc("/info", h.userInfo)
 
+	r.With(h.auth).Get("/changeEmail", h.changeEmail)
 	r.With(h.auth).Get("/profile", h.userProfile)
 	r.With(h.auth).Post("/profile", h.updateUserProfile)
 }
@@ -85,6 +86,8 @@ func (h *Handler) userSignUp(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	body.Name = strings.TrimSpace(body.Name)
+	body.Email = strings.TrimSpace(body.Email)
 
 	user, err := h.UserService.Create(r.Context(), body.Name, body.Email, body.Password)
 	if err != nil {
@@ -518,6 +521,39 @@ func (h *Handler) userActivateOTPQRCode(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+// GET /user/changeEmail
+func (h *Handler) changeEmail(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		clientError(w, http.StatusBadRequest)
+		return
+	}
+	email, err := h.UserService.ChangeEmail(r.Context(), token)
+	if err != nil {
+		if errors.Is(err, services.ErrInvalidCredentials) {
+			h.SessionManager.Put(r.Context(), "profilePageError", "emailChangeFailure")
+			http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+		} else if errors.Is(err, repos.ErrExists) {
+			h.SessionManager.Put(r.Context(), "profilePageError", "emailChangeFailureExists")
+			http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+		} else {
+			serverError(w, err)
+		}
+		return
+	}
+	user, err := h.UserService.FindByEmail(r.Context(), email)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	if user.ID == h.AuthService.AuthenticatedUserID(r.Context()) {
+		h.SessionManager.Put(r.Context(), "profilePageSuccess", "emailChangeSuccess")
+		http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+		return
+	}
+	w.Write([]byte("Success"))
+}
+
 // GET /user/profile
 func (h *Handler) userProfile(w http.ResponseWriter, r *http.Request) {
 	user, err := h.UserService.Find(r.Context(), h.AuthService.AuthenticatedUserID(r.Context()))
@@ -525,15 +561,33 @@ func (h *Handler) userProfile(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
-	type userDTO struct {
-		ID    ulid.ULID
-		Name  string
-		Email string
+	type profileData struct {
+		ID      ulid.ULID
+		Name    string
+		Email   string
+		Success string
+		Error   string
 	}
-	h.Renderer.render(w, r, http.StatusOK, "profile", h.newTemplateDataWithData(r, userDTO{
-		ID:    user.ID,
-		Name:  user.Name,
-		Email: user.Email,
+	lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
+
+	success := h.SessionManager.PopString(r.Context(), "profilePageSuccess")
+	success, err = services.Translate(lang, success)
+	if err != nil {
+		success = ""
+	}
+
+	error := h.SessionManager.PopString(r.Context(), "profilePageError")
+	error, err = services.Translate(lang, error)
+	if err != nil {
+		error = ""
+	}
+
+	h.Renderer.render(w, r, http.StatusOK, "profile", h.newTemplateDataWithData(r, profileData{
+		ID:      user.ID,
+		Name:    user.Name,
+		Email:   user.Email,
+		Success: success,
+		Error:   error,
 	}))
 }
 
@@ -546,7 +600,8 @@ func (h *Handler) updateUserProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type request struct {
-		Name string `form:"name" validate:"required,notblank,min=3,max=32"`
+		Name  string `form:"name" validate:"required,notblank,min=3,max=32"`
+		Email string `form:"email" validate:"required,email"`
 	}
 	type userDTO struct {
 		ID    ulid.ULID
@@ -561,6 +616,13 @@ func (h *Handler) updateUserProfile(w http.ResponseWriter, r *http.Request) {
 	body, ok := decodeAndValidateBody[request](h, w, r, "profile", &tmplData)
 	if !ok {
 		return
+	}
+	body.Name = strings.TrimSpace(body.Name)
+	body.Email = strings.TrimSpace(body.Email)
+	tmplData.Data = userDTO{
+		ID:    user.ID,
+		Name:  body.Name,
+		Email: body.Email,
 	}
 
 	err = h.UserService.Update(r.Context(), h.AuthService.AuthenticatedUserID(r.Context()), body.Name)
@@ -594,6 +656,17 @@ func (h *Handler) updateUserProfile(w http.ResponseWriter, r *http.Request) {
 			serverError(w, err)
 			return
 		}
+	}
+
+	lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
+	if body.Email != user.Email {
+		user.Name = body.Name
+		err = h.UserService.RequestChangeEmail(r.Context(), lang, user, body.Email)
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+		h.SessionManager.Put(r.Context(), "profilePageSuccess", "emailChangeRequested")
 	}
 
 	http.Redirect(w, r, "/user/profile", http.StatusSeeOther)

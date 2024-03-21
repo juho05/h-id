@@ -152,6 +152,33 @@ func (u *userRepository) UpdateOTP(ctx context.Context, id ulid.ULID, active boo
 	return repoErrResult("update otp: %w", result, err)
 }
 
+func (u *userRepository) CreateChangeEmailRequest(ctx context.Context, userID ulid.ULID, newEmail string, tokenHash []byte, lifetime time.Duration) error {
+	res, err := u.db.CreateChangeEmailRequest(ctx, db.CreateChangeEmailRequestParams{
+		ID: userID.String(),
+		NewEmail: sql.NullString{
+			String: newEmail,
+			Valid:  true,
+		},
+		NewEmailToken: tokenHash,
+		NewEmailExpires: sql.NullInt64{
+			Int64: time.Now().Add(lifetime).Unix(),
+			Valid: true,
+		},
+	})
+	return repoErrResult("create change email request: %w", res, err)
+}
+
+func (u *userRepository) UpdateEmail(ctx context.Context, changeTokenHash []byte) (string, error) {
+	email, err := u.db.UpdateEmail(ctx, db.UpdateEmailParams{
+		NewEmailToken: changeTokenHash,
+		Now: sql.NullInt64{
+			Int64: time.Now().Unix(),
+			Valid: true,
+		},
+	})
+	return email, repoErr("create change email request: %w", err)
+}
+
 func (u *userRepository) Delete(ctx context.Context, id ulid.ULID) error {
 	result, err := u.db.DeleteUser(ctx, id.String())
 	return repoErrResult("delete user: %w", result, err)

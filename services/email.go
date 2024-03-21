@@ -77,6 +77,8 @@ func (e *emailService) SendEmail(address, subject, messageName string, data emai
 	mime := "MIME-version: 1.0;\nContent-Type: text/html; charset=\"UTF-8\";\n\n"
 
 	subject = "Subject: " + subject + "\n"
+	from := "From: H-ID <" + config.EmailUsername() + ">\n"
+	to := "To: " + data.Name + " <" + address + ">\n"
 
 	t, ok := e.templates[messageName]
 	if !ok {
@@ -88,7 +90,7 @@ func (e *emailService) SendEmail(address, subject, messageName string, data emai
 		return fmt.Errorf("execute email template '%s': %w", messageName, err)
 	}
 
-	msg := []byte(subject + mime + "\n" + buffer.String())
+	msg := []byte(subject + from + to + mime + "\n" + buffer.String())
 	err = smtp.SendMail(config.EmailHost(), e.auth, config.EmailUsername(), []string{address}, msg)
 	if err != nil {
 		return fmt.Errorf("send email: %w", err)

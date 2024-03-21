@@ -20,5 +20,9 @@ UPDATE users SET email_confirmed = ? WHERE id = ?;
 UPDATE users SET otp_active = ?, otp_url = ? WHERE id = ?;
 -- name: SetOTPActive :execresult
 UPDATE users SET otp_active = ? WHERE id = ?;
+-- name: CreateChangeEmailRequest :execresult
+UPDATE users SET new_email = ?, new_email_token = ?, new_email_expires = ? WHERE id = ?;
+-- name: UpdateEmail :one
+UPDATE users SET email = new_email, new_email = NULL, new_email_token = NULL, new_email_expires = NULL WHERE new_email_token = ? AND new_email_expires > sqlc.arg(now) RETURNING email;
 -- name: DeleteUser :execresult
 DELETE FROM users WHERE id = ?;

@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/disintegration/imaging"
 	"github.com/oklog/ulid/v2"
@@ -25,28 +26,37 @@ import (
 
 type UserService interface {
 	Find(ctx context.Context, id ulid.ULID) (*repos.UserModel, error)
+	FindByEmail(ctx context.Context, email string) (*repos.UserModel, error)
 	Create(ctx context.Context, name, email, password string) (*repos.UserModel, error)
 	Update(ctx context.Context, id ulid.ULID, name string) error
 	SetProfilePicture(userID ulid.ULID, img image.Image) error
 	LoadProfilePicture(userID ulid.ULID, size int, writer io.Writer) error
 	ProfilePictureETag(userID ulid.ULID, size int) string
+	RequestChangeEmail(ctx context.Context, lang string, user *repos.UserModel, newEmail string) error
+	ChangeEmail(ctx context.Context, token string) (string, error)
 	Delete(ctx context.Context, id ulid.ULID, password string) error
 }
 
 type userService struct {
-	userRepo    repos.UserRepository
-	authService AuthService
+	userRepo     repos.UserRepository
+	authService  AuthService
+	emailService EmailService
 }
 
-func NewUserService(userRepository repos.UserRepository, authService AuthService) UserService {
+func NewUserService(userRepository repos.UserRepository, authService AuthService, emailService EmailService) UserService {
 	return &userService{
-		userRepo:    userRepository,
-		authService: authService,
+		userRepo:     userRepository,
+		authService:  authService,
+		emailService: emailService,
 	}
 }
 
 func (u *userService) Find(ctx context.Context, id ulid.ULID) (*repos.UserModel, error) {
 	return u.userRepo.Find(ctx, id)
+}
+
+func (u *userService) FindByEmail(ctx context.Context, email string) (*repos.UserModel, error) {
+	return u.userRepo.FindByEmail(ctx, email)
 }
 
 func (u *userService) Create(ctx context.Context, name, email, password string) (*repos.UserModel, error) {
@@ -117,6 +127,39 @@ func (u *userService) ProfilePictureETag(userID ulid.ULID, size int) string {
 		return fmt.Sprintf("%x", md5.Sum([]byte("default")))
 	}
 	return fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%s%d", stat.Name(), stat.ModTime().UnixMilli()+stat.Size()+int64(size)))))
+}
+
+func (u *userService) RequestChangeEmail(ctx context.Context, lang string, user *repos.UserModel, newEmail string) error {
+	_, err := u.userRepo.FindByEmail(ctx, newEmail)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, repos.ErrNoRecord) {
+		return fmt.Errorf("request change email: %w", err)
+	}
+	token := generateToken(64)
+	tokenHash := hashTokenWeak(token)
+	err = u.userRepo.CreateChangeEmailRequest(ctx, user.ID, newEmail, tokenHash, 3*time.Hour)
+	if err != nil {
+		return fmt.Errorf("request change email: %w", err)
+	}
+	data := newEmailTemplateData(user.Name, lang)
+	data.Code = token
+	go func() {
+		err := u.emailService.SendEmail(newEmail, "Change Email", "changeEmail", data)
+		if err != nil {
+			log.Errorf("Failed to send email: %s", err)
+		}
+	}()
+	return nil
+}
+
+func (u *userService) ChangeEmail(ctx context.Context, token string) (string, error) {
+	email, err := u.userRepo.UpdateEmail(ctx, hashTokenWeak(token))
+	if errors.Is(err, repos.ErrNoRecord) {
+		err = ErrInvalidCredentials
+	}
+	return email, err
 }
 
 func profilePicturePath(userID ulid.ULID) string {

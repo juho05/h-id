@@ -15,6 +15,7 @@
   --link: #2da8ed;
   --error: #ff2020;
   --success: #1cc838;
+  --warning: #ffa318;
   --border: #e4e4e4;
   --error-border: #e31e1e;
   --input-border: #e4e4e4;
@@ -34,6 +35,7 @@
     --link: #2da8ed;
     --error: #ff2020;
     --success: #1cc838;
+    --warning: #ffa318;
     --border: #1d1d1d;
     --error-border: #8d1111;
     --input-border: #2c2c2c;
@@ -108,19 +110,29 @@ a {
 }
 
 #profilePictureContainer {
-  height: 25vh;
   text-align: center;
-  margin-bottom: 1vh;
 }
 
 #profilePicture {
-  height: 90%;
+  height: 22vh;
   border-radius: 5%;
 }
 
 #profilePage > .input-label {
   font-weight: 500;
   font-size: 18px;
+}
+
+.hint-label-error {
+  color: var(--error);
+}
+
+.hint-label-success {
+  color: var(--success);
+}
+
+.hint-label-warning {
+  color: var(--warning);
 }
 
 #nav-brand {
@@ -193,6 +205,8 @@ a {
   margin-top: 1%;
   font-size: 11pt;
 }
+
+
 
 .invisible {
   display: none !important;

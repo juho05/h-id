@@ -4,7 +4,9 @@
 
 package db
 
-import ()
+import (
+	"database/sql"
+)
 
 type Client struct {
 	ID           string
@@ -59,12 +61,15 @@ type Token struct {
 }
 
 type User struct {
-	ID             string
-	CreatedAt      int64
-	Name           string
-	Email          string
-	EmailConfirmed bool
-	PasswordHash   []byte
-	OtpActive      bool
-	OtpUrl         string
+	ID              string
+	CreatedAt       int64
+	Name            string
+	Email           string
+	EmailConfirmed  bool
+	PasswordHash    []byte
+	OtpActive       bool
+	OtpUrl          string
+	NewEmail        sql.NullString
+	NewEmailToken   []byte
+	NewEmailExpires sql.NullInt64
 }

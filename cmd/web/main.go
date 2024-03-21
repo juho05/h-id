@@ -51,7 +51,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("new auth service: %w", err)
 	}
-	handler.UserService = services.NewUserService(userRepo, handler.AuthService)
+	handler.UserService = services.NewUserService(userRepo, handler.AuthService, emailService)
 	handler.ClientService = services.NewClientService(clientRepo)
 
 	handler.Renderer, err = handlers.NewRenderer(hid.HTMLFS)

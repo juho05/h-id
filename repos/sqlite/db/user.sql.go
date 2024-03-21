@@ -10,12 +10,32 @@ import (
 	"database/sql"
 )
 
+const createChangeEmailRequest = `-- name: CreateChangeEmailRequest :execresult
+UPDATE users SET new_email = ?, new_email_token = ?, new_email_expires = ? WHERE id = ?
+`
+
+type CreateChangeEmailRequestParams struct {
+	NewEmail        sql.NullString
+	NewEmailToken   []byte
+	NewEmailExpires sql.NullInt64
+	ID              string
+}
+
+func (q *Queries) CreateChangeEmailRequest(ctx context.Context, arg CreateChangeEmailRequestParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, createChangeEmailRequest,
+		arg.NewEmail,
+		arg.NewEmailToken,
+		arg.NewEmailExpires,
+		arg.ID,
+	)
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (
   id, created_at, name, email, email_confirmed, password_hash, otp_active, otp_url
 ) VALUES (
   ?, ?, ?, ?, ?, ?, ?, ?
-) RETURNING id, created_at, name, email, email_confirmed, password_hash, otp_active, otp_url
+) RETURNING id, created_at, name, email, email_confirmed, password_hash, otp_active, otp_url, new_email, new_email_token, new_email_expires
 `
 
 type CreateUserParams struct {
@@ -50,6 +70,9 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.PasswordHash,
 		&i.OtpActive,
 		&i.OtpUrl,
+		&i.NewEmail,
+		&i.NewEmailToken,
+		&i.NewEmailExpires,
 	)
 	return i, err
 }
@@ -63,7 +86,7 @@ func (q *Queries) DeleteUser(ctx context.Context, id string) (sql.Result, error)
 }
 
 const findUser = `-- name: FindUser :one
-SELECT id, created_at, name, email, email_confirmed, password_hash, otp_active, otp_url FROM users WHERE id = ?
+SELECT id, created_at, name, email, email_confirmed, password_hash, otp_active, otp_url, new_email, new_email_token, new_email_expires FROM users WHERE id = ?
 `
 
 func (q *Queries) FindUser(ctx context.Context, id string) (User, error) {
@@ -78,12 +101,15 @@ func (q *Queries) FindUser(ctx context.Context, id string) (User, error) {
 		&i.PasswordHash,
 		&i.OtpActive,
 		&i.OtpUrl,
+		&i.NewEmail,
+		&i.NewEmailToken,
+		&i.NewEmailExpires,
 	)
 	return i, err
 }
 
 const findUserByEmail = `-- name: FindUserByEmail :one
-SELECT id, created_at, name, email, email_confirmed, password_hash, otp_active, otp_url FROM users WHERE email = ?
+SELECT id, created_at, name, email, email_confirmed, password_hash, otp_active, otp_url, new_email, new_email_token, new_email_expires FROM users WHERE email = ?
 `
 
 func (q *Queries) FindUserByEmail(ctx context.Context, email string) (User, error) {
@@ -98,6 +124,9 @@ func (q *Queries) FindUserByEmail(ctx context.Context, email string) (User, erro
 		&i.PasswordHash,
 		&i.OtpActive,
 		&i.OtpUrl,
+		&i.NewEmail,
+		&i.NewEmailToken,
+		&i.NewEmailExpires,
 	)
 	return i, err
 }
@@ -140,6 +169,22 @@ type SetOTPActiveParams struct {
 
 func (q *Queries) SetOTPActive(ctx context.Context, arg SetOTPActiveParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, setOTPActive, arg.OtpActive, arg.ID)
+}
+
+const updateEmail = `-- name: UpdateEmail :one
+UPDATE users SET email = new_email, new_email = NULL, new_email_token = NULL, new_email_expires = NULL WHERE new_email_token = ? AND new_email_expires > ?2 RETURNING email
+`
+
+type UpdateEmailParams struct {
+	NewEmailToken []byte
+	Now           sql.NullInt64
+}
+
+func (q *Queries) UpdateEmail(ctx context.Context, arg UpdateEmailParams) (string, error) {
+	row := q.db.QueryRowContext(ctx, updateEmail, arg.NewEmailToken, arg.Now)
+	var email string
+	err := row.Scan(&email)
+	return email, err
 }
 
 const updateEmailConfirmed = `-- name: UpdateEmailConfirmed :execresult
