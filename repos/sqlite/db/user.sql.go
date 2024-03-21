@@ -108,6 +108,34 @@ func (q *Queries) FindUser(ctx context.Context, id string) (User, error) {
 	return i, err
 }
 
+const findUserByChangeEmailToken = `-- name: FindUserByChangeEmailToken :one
+SELECT id, created_at, name, email, email_confirmed, password_hash, otp_active, otp_url, new_email, new_email_token, new_email_expires FROM users WHERE new_email_token = ? AND new_email_expires > ?2
+`
+
+type FindUserByChangeEmailTokenParams struct {
+	NewEmailToken []byte
+	Now           sql.NullInt64
+}
+
+func (q *Queries) FindUserByChangeEmailToken(ctx context.Context, arg FindUserByChangeEmailTokenParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, findUserByChangeEmailToken, arg.NewEmailToken, arg.Now)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.Name,
+		&i.Email,
+		&i.EmailConfirmed,
+		&i.PasswordHash,
+		&i.OtpActive,
+		&i.OtpUrl,
+		&i.NewEmail,
+		&i.NewEmailToken,
+		&i.NewEmailExpires,
+	)
+	return i, err
+}
+
 const findUserByEmail = `-- name: FindUserByEmail :one
 SELECT id, created_at, name, email, email_confirmed, password_hash, otp_active, otp_url, new_email, new_email_token, new_email_expires FROM users WHERE email = ?
 `

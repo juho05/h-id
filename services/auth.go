@@ -365,7 +365,7 @@ func (a *authService) SendConfirmEmail(r *http.Request, ctx context.Context, use
 	}
 
 	go func() {
-		err := a.emailService.SendEmail(user.Email, "Confirm Email", "confirmEmail", data)
+		err := a.emailService.SendEmail(user.Email, MustTranslate(lang, "confirmEmail"), "confirmEmail", data)
 		if err != nil {
 			log.Errorf("Failed to send email: %s", err)
 		}

@@ -60,6 +60,9 @@ var translations = map[string]map[string]string{
 		"emailAlreadyInUse":         "This email address is already in use by another account.",
 		"profilePictureTooLarge":    "Profile picture size must not exceed 10 MB",
 		"profilePictureWrongFormat": "Profile picture must be in JPEG, PNG or GIF format",
+		"emailChanged":              "Email Changed",
+		"unexpectedEmailChange":     "You didn't change your email address for H-ID?",
+		"emailChangedTo":            "Your email address has been changed to:",
 	},
 	"de": {
 		"login":                     "Anmelden",
@@ -114,6 +117,9 @@ var translations = map[string]map[string]string{
 		"emailAlreadyInUse":         "Diese Adresse wird bereits für einen anderen Account genutzt.",
 		"profilePictureTooLarge":    "Profilbilder dürfen nicht größer als 10 MB sein.",
 		"profilePictureWrongFormat": "Profilbilder müssen im JPEG, PNG oder GIF Format sein.",
+		"emailChanged":              "Email Änderung",
+		"unexpectedEmailChange":     "Du hast deine Email-Adresse bei H-ID nicht geändert?",
+		"emailChangedTo":            "Deine Email-Adresse wurde geändert zu:",
 	},
 }
 

@@ -33,7 +33,7 @@ type UserService interface {
 	LoadProfilePicture(userID ulid.ULID, size int, writer io.Writer) error
 	ProfilePictureETag(userID ulid.ULID, size int) string
 	RequestChangeEmail(ctx context.Context, lang string, user *repos.UserModel, newEmail string) error
-	ChangeEmail(ctx context.Context, token string) (string, error)
+	ChangeEmail(ctx context.Context, lang, token string) (string, error)
 	Delete(ctx context.Context, id ulid.ULID, password string) error
 }
 
@@ -146,7 +146,7 @@ func (u *userService) RequestChangeEmail(ctx context.Context, lang string, user 
 	data := newEmailTemplateData(user.Name, lang)
 	data.Code = token
 	go func() {
-		err := u.emailService.SendEmail(newEmail, "Change Email", "changeEmail", data)
+		err := u.emailService.SendEmail(newEmail, MustTranslate(lang, "changeEmail"), "changeEmail", data)
 		if err != nil {
 			log.Errorf("Failed to send email: %s", err)
 		}
@@ -154,12 +154,31 @@ func (u *userService) RequestChangeEmail(ctx context.Context, lang string, user 
 	return nil
 }
 
-func (u *userService) ChangeEmail(ctx context.Context, token string) (string, error) {
-	email, err := u.userRepo.UpdateEmail(ctx, hashTokenWeak(token))
-	if errors.Is(err, repos.ErrNoRecord) {
-		err = ErrInvalidCredentials
+func (u *userService) ChangeEmail(ctx context.Context, lang, token string) (string, error) {
+	tokenHash := hashTokenWeak(token)
+	user, err := u.userRepo.FindByChangeEmailToken(ctx, tokenHash)
+	if err != nil {
+		if errors.Is(err, repos.ErrNoRecord) {
+			err = ErrInvalidCredentials
+		}
+		return "", err
 	}
-	return email, err
+	email, err := u.userRepo.UpdateEmail(ctx, tokenHash)
+	if err != nil {
+		if errors.Is(err, repos.ErrNoRecord) {
+			err = ErrInvalidCredentials
+		}
+		return "", err
+	}
+	data := newEmailTemplateData(user.Name, lang)
+	data.NewEmail = email
+	go func() {
+		err := u.emailService.SendEmail(user.Email, MustTranslate(lang, "emailChanged"), "emailChanged", data)
+		if err != nil {
+			log.Errorf("Failed to send email: %s", err)
+		}
+	}()
+	return email, nil
 }
 
 func profilePicturePath(userID ulid.ULID) string {

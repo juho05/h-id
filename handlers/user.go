@@ -599,7 +599,8 @@ func (h *Handler) updateEmail(w http.ResponseWriter, r *http.Request) {
 		clientError(w, http.StatusBadRequest)
 		return
 	}
-	email, err := h.UserService.ChangeEmail(r.Context(), token)
+	lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
+	email, err := h.UserService.ChangeEmail(r.Context(), lang, token)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidCredentials) {
 			h.SessionManager.Put(r.Context(), "profilePageError", "emailChangeFailure")

@@ -21,6 +21,7 @@ type UserModel struct {
 type UserRepository interface {
 	Find(ctx context.Context, id ulid.ULID) (*UserModel, error)
 	FindByEmail(ctx context.Context, email string) (*UserModel, error)
+	FindByChangeEmailToken(ctx context.Context, tokenHash []byte) (*UserModel, error)
 	GetPasswordHash(ctx context.Context, userID ulid.ULID) ([]byte, error)
 	GetOTP(ctx context.Context, userID ulid.ULID) (active bool, key *otp.Key, err error)
 	Create(ctx context.Context, name, email string, passwordHash []byte) (*UserModel, error)

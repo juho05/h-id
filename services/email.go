@@ -22,10 +22,11 @@ type emailService struct {
 }
 
 type emailTemplateData struct {
-	Name    string
-	Code    string
-	BaseURL string
-	Lang    string
+	Name     string
+	Code     string
+	BaseURL  string
+	Lang     string
+	NewEmail string
 }
 
 func newEmailTemplateData(name, lang string) emailTemplateData {

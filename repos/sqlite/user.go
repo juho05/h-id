@@ -67,6 +67,20 @@ func (u *userRepository) FindByEmail(ctx context.Context, email string) (*repos.
 	return repoUser(user)
 }
 
+func (u *userRepository) FindByChangeEmailToken(ctx context.Context, tokenHash []byte) (*repos.UserModel, error) {
+	user, err := u.db.FindUserByChangeEmailToken(ctx, db.FindUserByChangeEmailTokenParams{
+		NewEmailToken: tokenHash,
+		Now: sql.NullInt64{
+			Int64: time.Now().Unix(),
+			Valid: true,
+		},
+	})
+	if err != nil {
+		return nil, repoErr("find user by change email token: %w", err)
+	}
+	return repoUser(user)
+}
+
 func (u *userRepository) GetPasswordHash(ctx context.Context, userID ulid.ULID) ([]byte, error) {
 	hash, err := u.db.GetUserPasswordHash(ctx, userID.String())
 	if err != nil {

@@ -2,6 +2,8 @@
 SELECT * FROM users WHERE id = ?;
 -- name: FindUserByEmail :one
 SELECT * FROM users WHERE email = ?;
+-- name: FindUserByChangeEmailToken :one
+SELECT * FROM users WHERE new_email_token = ? AND new_email_expires > sqlc.arg(now);
 -- name: GetUserPasswordHash :one
 SELECT password_hash FROM users WHERE id = ?;
 -- name: GetOTP :one
