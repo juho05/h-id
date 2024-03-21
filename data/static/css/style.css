@@ -271,6 +271,9 @@ input:disabled {
   font-size: 16px;
   line-height: 18px;
   font-family: 'Roboto', sans-serif;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  cursor: copy;
 }
 
 #activate-otp-page form {

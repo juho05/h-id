@@ -7,7 +7,7 @@
   <div id="qr-code-container">
     <img id="qr-code" src="/user/2fa/otp/activate/qr?size=500" alt="QR code">
   </div>
-  <label id="left-aligned" for="secret-key">{{translate .Lang "secretKey"}}:</label>
+  <label id="left-aligned" for="secret-key">{{translate .Lang "secretKey"}} ({{translate .Lang "clickToCopy"}}):</label>
   <p id="otp-secret">{{.Form.Secret}}</p>
 
   <form class="form" action="/user/2fa/otp/activate" method="POST">
