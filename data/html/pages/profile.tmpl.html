@@ -19,11 +19,13 @@
         <input hidden type="file" name="profile_picture" id="profilePictureInput">
         <label id="profilePictureSaveHint" class="hint-label hint-label-warning invisible" for="profilePicture">{{translate .Lang "pressUpdateToUpload"}}</label>
         {{with .FieldErrors.ProfilePicture}}<label class="error-label" for="profilePicture">{{.}}</label>{{end}}
-        {{if .Data.Success}}
-        <label class="hint-label hint-label-success">{{.Data.Success}}</label>
-        {{end}}
-        {{if .Data.Error}}
-        <label class="hint-label hint-label-error">{{.Data.Error}}</label>
+        {{with .Data}}
+          {{if .Success}}
+          <label class="hint-label hint-label-success">{{.Success}}</label>
+          {{end}}
+          {{if .Error}}
+          <label class="hint-label hint-label-error">{{.Error}}</label>
+          {{end}}
         {{end}}
       </div>
 
