@@ -292,6 +292,24 @@ func (h *Handler) verifyOTPPage(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/user/login"+redirectQuery, http.StatusSeeOther)
 		return
 	}
+	active, err := h.AuthService.IsOTPActive(r.Context(), userID)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	if !active {
+		err = h.AuthService.Login(r.Context(), userID)
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+		if redirect := h.SessionManager.PopString(r.Context(), "loginRedirect"); redirect != "" {
+			http.Redirect(w, r, redirect, http.StatusSeeOther)
+			return
+		}
+		http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+		return
+	}
 	h.Renderer.render(w, r, http.StatusOK, "verifyOTP", h.newTemplateData(r))
 }
 

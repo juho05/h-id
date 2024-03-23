@@ -110,7 +110,7 @@ func (h *Handler) auth(next http.Handler) http.Handler {
 			return
 		}
 
-		if !slices.Contains([]string{"/user/confirmEmail", "/user/2fa/otp/activate", "/user/2fa/recovery"}, r.URL.Path) {
+		if !slices.Contains([]string{"/user/logout", "/user/confirmEmail", "/user/2fa/otp/activate", "/user/2fa/recovery"}, r.URL.Path) {
 			confirmed, err := h.AuthService.IsEmailConfirmed(r.Context(), userID)
 			if err != nil {
 				h.SessionManager.Destroy(r.Context())
