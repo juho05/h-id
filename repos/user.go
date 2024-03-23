@@ -31,5 +31,9 @@ type UserRepository interface {
 	UpdateOTP(ctx context.Context, id ulid.ULID, active bool, otpKey *otp.Key) error
 	CreateChangeEmailRequest(ctx context.Context, userID ulid.ULID, newEmail string, tokenHash []byte, lifetime time.Duration) error
 	UpdateEmail(ctx context.Context, changeTokenHash []byte) (string, error)
+	CreateRecoveryCodes(ctx context.Context, userID ulid.ULID, codeHashes [][]byte) error
+	CountRecoveryCodes(ctx context.Context, userID ulid.ULID) (int, error)
+	DeleteRecoveryCode(ctx context.Context, userID ulid.ULID, codeHash []byte) error
+	DeleteRecoveryCodes(ctx context.Context, userID ulid.ULID) error
 	Delete(ctx context.Context, id ulid.ULID) error
 }

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -109,26 +110,39 @@ func (h *Handler) auth(next http.Handler) http.Handler {
 			return
 		}
 
-		confirmed, err := h.AuthService.IsEmailConfirmed(r.Context(), userID)
-		if err != nil {
-			h.SessionManager.Destroy(r.Context())
-			http.Redirect(w, r, fmt.Sprintf("/user/login?redirect=%s", url.QueryEscape(r.URL.RequestURI())), http.StatusSeeOther)
-			return
-		}
-		if !confirmed {
-			http.Redirect(w, r, fmt.Sprintf("/user/confirmEmail?redirect=%s", url.QueryEscape(r.URL.RequestURI())), http.StatusSeeOther)
-			return
-		}
+		if !slices.Contains([]string{"/user/confirmEmail", "/user/2fa/otp/activate", "/user/2fa/recovery"}, r.URL.Path) {
+			confirmed, err := h.AuthService.IsEmailConfirmed(r.Context(), userID)
+			if err != nil {
+				h.SessionManager.Destroy(r.Context())
+				http.Redirect(w, r, fmt.Sprintf("/user/login?redirect=%s", url.QueryEscape(r.URL.RequestURI())), http.StatusSeeOther)
+				return
+			}
+			if !confirmed {
+				http.Redirect(w, r, fmt.Sprintf("/user/confirmEmail?redirect=%s", url.QueryEscape(r.URL.RequestURI())), http.StatusSeeOther)
+				return
+			}
 
-		otpActive, err := h.AuthService.IsOTPActive(r.Context(), userID)
-		if err != nil {
-			h.SessionManager.Destroy(r.Context())
-			http.Redirect(w, r, fmt.Sprintf("/user/login?redirect=%s", url.QueryEscape(r.URL.RequestURI())), http.StatusSeeOther)
-			return
-		}
-		if !otpActive {
-			http.Redirect(w, r, fmt.Sprintf("/user/2fa/otp/activate?redirect=%s", url.QueryEscape(r.URL.RequestURI())), http.StatusSeeOther)
-			return
+			otpActive, err := h.AuthService.IsOTPActive(r.Context(), userID)
+			if err != nil {
+				h.SessionManager.Destroy(r.Context())
+				http.Redirect(w, r, fmt.Sprintf("/user/login?redirect=%s", url.QueryEscape(r.URL.RequestURI())), http.StatusSeeOther)
+				return
+			}
+			if !otpActive {
+				http.Redirect(w, r, fmt.Sprintf("/user/2fa/otp/activate?redirect=%s", url.QueryEscape(r.URL.RequestURI())), http.StatusSeeOther)
+				return
+			}
+
+			hasRecovery, err := h.AuthService.HasRecoveryCodes(r.Context(), userID)
+			if err != nil {
+				h.SessionManager.Destroy(r.Context())
+				http.Redirect(w, r, fmt.Sprintf("/user/login?redirect=%s", url.QueryEscape(r.URL.RequestURI())), http.StatusSeeOther)
+				return
+			}
+			if !hasRecovery {
+				http.Redirect(w, r, fmt.Sprintf("/user/2fa/recovery?redirect=%s", url.QueryEscape(r.URL.RequestURI())), http.StatusSeeOther)
+				return
+			}
 		}
 
 		r = r.WithContext(context.WithValue(r.Context(), services.AuthUserIDCtxKey{}, userID))

@@ -1,0 +1,19 @@
+{{define "title"}}{{translate .Lang "recoveryCodes"}}{{end}}
+
+{{define "main"}}
+<div class="form-panel">
+  <h2 class="form-title">{{translate .Lang "recoveryCodes"}}</h2>
+  <form class="form" action="/user/2fa/recovery" method="POST">
+    <label class="hint-label hint-label-warning" id="recoveryCodesExplanation">{{translate .Lang "recoveryCodesExplanation"}}</label>
+    <div id="recoveryCodesContainer">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <textarea id="recoveryCodes" name="recoveryCodes" readonly>{{.Form.RecoveryCodes}}</textarea>
+    </div>
+    <div class="submit-div">
+      <input id="downloadBtn" class="btn" type="submit" value="{{translate .Lang "download"}}">
+      <input id="continueBtn" class="btn invisible" type="submit" value="{{translate .Lang "continue"}}">
+    </div>
+  </form>
+  <script src="/static/js/recoveryCodes.js"></script>
+</div>
+{{end}}

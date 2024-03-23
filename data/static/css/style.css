@@ -123,6 +123,11 @@ a {
   font-size: 18px;
 }
 
+#profilePage .link {
+  margin-top: 2%;
+  display: inline-block;
+}
+
 #profilePage #email {
   display: block;
   width: calc(100% - 16px);
@@ -370,6 +375,25 @@ select:focus {
 #forgotPasswordPanel .hint-label-success {
   margin-top: 2vh;
   margin-bottom: -1.5vh;
+}
+
+#recoveryCodesContainer {
+  flex-grow: 1;
+  display: flex;
+  margin-top: 2vh;
+  margin-bottom: 8vh;
+}
+
+textarea#recoveryCodes {
+  display: block;
+  resize: none;
+  flex-grow: 1;
+  line-height: 30px;
+  text-align: center;
+  padding-top: 2vh;
+}
+#recoveryCodesExplanation {
+  text-align: center;
 }
 
 @font-face {

@@ -15,12 +15,14 @@ import (
 )
 
 type userRepository struct {
-	db *db.Queries
+	db    *db.Queries
+	rawDB *sql.DB
 }
 
 func (db *DB) NewUserRepository() repos.UserRepository {
 	return &userRepository{
-		db: db.db,
+		db:    db.db,
+		rawDB: db.rawDB,
 	}
 }
 
@@ -199,6 +201,44 @@ func (u *userRepository) UpdateEmail(ctx context.Context, changeTokenHash []byte
 		},
 	})
 	return email, repoErr("create change email request: %w", err)
+}
+
+func (u *userRepository) CreateRecoveryCodes(ctx context.Context, userID ulid.ULID, codeHashes [][]byte) error {
+	sqlTx, err := u.rawDB.Begin()
+	if err != nil {
+		return err
+	}
+	defer sqlTx.Rollback()
+	tx := u.db.WithTx(sqlTx)
+	for _, c := range codeHashes {
+		err = tx.CreateRecoveryCode(ctx, db.CreateRecoveryCodeParams{
+			CreatedAt: time.Now().Unix(),
+			UserID:    userID.String(),
+			CodeHash:  c,
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return sqlTx.Commit()
+}
+
+func (u *userRepository) CountRecoveryCodes(ctx context.Context, userID ulid.ULID) (int, error) {
+	count, err := u.db.CountRecoveryCodes(ctx, userID.String())
+	return int(count), err
+}
+
+func (u *userRepository) DeleteRecoveryCode(ctx context.Context, userID ulid.ULID, codeHash []byte) error {
+	res, err := u.db.DeleteRecoveryCode(ctx, db.DeleteRecoveryCodeParams{
+		UserID:   userID.String(),
+		CodeHash: codeHash,
+	})
+	return repoErrResult("delete recovery code: %w", res, err)
+}
+
+func (u *userRepository) DeleteRecoveryCodes(ctx context.Context, userID ulid.ULID) error {
+	res, err := u.db.DeleteRecoveryCodes(ctx, userID.String())
+	return repoErrResult("delete recovery codes: %w", res, err)
 }
 
 func (u *userRepository) Delete(ctx context.Context, id ulid.ULID) error {

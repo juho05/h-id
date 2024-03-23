@@ -10,6 +10,17 @@ import (
 	"database/sql"
 )
 
+const countRecoveryCodes = `-- name: CountRecoveryCodes :one
+SELECT COUNT(code_hash) FROM recovery_codes WHERE user_id = ?
+`
+
+func (q *Queries) CountRecoveryCodes(ctx context.Context, userID string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countRecoveryCodes, userID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createChangeEmailRequest = `-- name: CreateChangeEmailRequest :execresult
 UPDATE users SET new_email = ?, new_email_token = ?, new_email_expires = ? WHERE id = ?
 `
@@ -28,6 +39,21 @@ func (q *Queries) CreateChangeEmailRequest(ctx context.Context, arg CreateChange
 		arg.NewEmailExpires,
 		arg.ID,
 	)
+}
+
+const createRecoveryCode = `-- name: CreateRecoveryCode :exec
+INSERT INTO recovery_codes (created_at,user_id,code_hash) VALUES (?,?,?)
+`
+
+type CreateRecoveryCodeParams struct {
+	CreatedAt int64
+	UserID    string
+	CodeHash  []byte
+}
+
+func (q *Queries) CreateRecoveryCode(ctx context.Context, arg CreateRecoveryCodeParams) error {
+	_, err := q.db.ExecContext(ctx, createRecoveryCode, arg.CreatedAt, arg.UserID, arg.CodeHash)
+	return err
 }
 
 const createUser = `-- name: CreateUser :one
@@ -75,6 +101,27 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.NewEmailExpires,
 	)
 	return i, err
+}
+
+const deleteRecoveryCode = `-- name: DeleteRecoveryCode :execresult
+DELETE FROM recovery_codes WHERE user_id = ? AND code_hash = ?
+`
+
+type DeleteRecoveryCodeParams struct {
+	UserID   string
+	CodeHash []byte
+}
+
+func (q *Queries) DeleteRecoveryCode(ctx context.Context, arg DeleteRecoveryCodeParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, deleteRecoveryCode, arg.UserID, arg.CodeHash)
+}
+
+const deleteRecoveryCodes = `-- name: DeleteRecoveryCodes :execresult
+DELETE FROM recovery_codes WHERE user_id = ?
+`
+
+func (q *Queries) DeleteRecoveryCodes(ctx context.Context, userID string) (sql.Result, error) {
+	return q.db.ExecContext(ctx, deleteRecoveryCodes, userID)
 }
 
 const deleteUser = `-- name: DeleteUser :execresult

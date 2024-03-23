@@ -49,5 +49,5 @@ func (h *Handler) registerStaticRouts() {
 	}
 	h.Router.With(staticCache(7*24*time.Hour)).Handle("/static/img/*", http.StripPrefix("/static/img/", http.FileServer(http.FS(img))))
 
-	h.Router.With(staticCache(24*time.Hour)).Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(h.StaticFS))))
+	h.Router.With(staticCache(1*time.Hour)).Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(h.StaticFS))))
 }

@@ -47,6 +47,11 @@ func (h *Handler) userRoutes(r chi.Router) {
 	r.Post("/2fa/otp/activate", h.userActivateOTP)
 	r.Get("/2fa/otp/activate/qr", h.userActivateOTPQRCode)
 
+	r.With(h.auth).Get("/2fa/recovery", h.recoveryCodesPage)
+	r.With(h.auth).Post("/2fa/recovery", h.recoveryCodes)
+	r.With(h.auth).Get("/2fa/recovery/reset", h.newPage("resetRecoveryCodes"))
+	r.With(h.auth).Post("/2fa/recovery/reset", h.resetRecoveryCodes)
+
 	r.With(h.noauth).Get("/2fa/otp/verify", h.verifyOTPPage)
 	r.With(h.noauth).Post("/2fa/otp/verify", h.verifyOTP)
 
@@ -293,7 +298,7 @@ func (h *Handler) verifyOTPPage(w http.ResponseWriter, r *http.Request) {
 // POST /user/2fa/otp/verify
 func (h *Handler) verifyOTP(w http.ResponseWriter, r *http.Request) {
 	type request struct {
-		Code string `form:"code" validate:"required,numeric,len=6"`
+		Code string `form:"code" validate:"required,min=6"`
 	}
 	body, ok := decodeAndValidateBody[request](h, w, r, "verifyOTP", nil)
 	if !ok {
@@ -619,6 +624,101 @@ func (h *Handler) userActivateOTPQRCode(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		log.Error("encode otp qr code: %w", err)
 	}
+}
+
+// GET /user/2fa/recovery
+func (h *Handler) recoveryCodesPage(w http.ResponseWriter, r *http.Request) {
+	if redirect := r.URL.Query().Get("redirect"); redirect != "" {
+		u, err := url.Parse(redirect)
+		if err == nil {
+			if u.IsAbs() {
+				clientError(w, http.StatusBadRequest)
+				return
+			}
+			h.SessionManager.Put(r.Context(), "recoveryCodesRedirect", "/"+strings.TrimPrefix(redirect, "/"))
+		}
+	} else {
+		h.SessionManager.Remove(r.Context(), "recoveryCodesRedirect")
+	}
+	userID := h.AuthService.AuthenticatedUserID(r.Context())
+	has, err := h.AuthService.HasRecoveryCodes(r.Context(), userID)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	if has {
+		http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+		return
+	}
+	codes, err := h.AuthService.GenerateRecoveryCodes(r.Context(), userID)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	data := h.newTemplateData(r)
+	type formData struct {
+		RecoveryCodes string
+	}
+	data.Form = formData{
+		RecoveryCodes: strings.Join(codes, "\n"),
+	}
+	h.Renderer.render(w, r, http.StatusOK, "recoveryCodes", data)
+}
+
+// POST /user/2fa/recovery
+func (h *Handler) recoveryCodes(w http.ResponseWriter, r *http.Request) {
+	if h.SessionManager.PopBool(r.Context(), "recoveryCodesDownloaded") {
+		if redirect := h.SessionManager.PopString(r.Context(), "recoveryCodesRedirect"); redirect != "" {
+			http.Redirect(w, r, redirect, http.StatusSeeOther)
+			return
+		}
+		http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+		return
+	}
+	type request struct {
+		RecoveryCodes string `form:"recoveryCodes" validate:"required"`
+	}
+	body, ok := decodeAndValidateBody[request](h, w, r, "recoveryCodes", nil)
+	if !ok {
+		return
+	}
+	h.SessionManager.Put(r.Context(), "recoveryCodesDownloaded", true)
+	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Content-Disposition", "attachment; filename=h-id_recovery-codes.txt")
+	_, err := w.Write([]byte(strings.TrimSpace(body.RecoveryCodes)))
+	if err != nil {
+		serverError(w, err)
+	}
+}
+
+func (h *Handler) resetRecoveryCodes(w http.ResponseWriter, r *http.Request) {
+	user, err := h.UserService.Find(r.Context(), h.AuthService.AuthenticatedUserID(r.Context()))
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+
+	type request struct {
+		Password string `form:"password" validate:"required"`
+	}
+	body, ok := decodeAndValidateBody[request](h, w, r, "resetRecoveryCodes", nil)
+	if !ok {
+		return
+	}
+
+	tmplData := h.newTemplateData(r)
+	err = h.AuthService.DeleteRecoveryCodes(r.Context(), user.ID, body.Password)
+	if err != nil {
+		if errors.Is(err, services.ErrInvalidCredentials) {
+			lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
+			tmplData.FieldErrors["Password"] = services.MustTranslate(lang, "wrongPassword")
+			h.Renderer.render(w, r, http.StatusUnprocessableEntity, "resetRecoveryCodes", tmplData)
+		} else {
+			serverError(w, err)
+		}
+		return
+	}
+	http.Redirect(w, r, "/user/2fa/recovery", http.StatusSeeOther)
 }
 
 // GET /user/changeEmail

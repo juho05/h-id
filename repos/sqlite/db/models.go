@@ -39,6 +39,12 @@ type Permission struct {
 	Scopes    string
 }
 
+type RecoveryCode struct {
+	CreatedAt int64
+	UserID    string
+	CodeHash  []byte
+}
+
 type RsaKey struct {
 	Name      string
 	CreatedAt int64

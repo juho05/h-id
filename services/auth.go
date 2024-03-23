@@ -57,6 +57,10 @@ type AuthService interface {
 	VerifyOTPCode(ctx context.Context, userID ulid.ULID, code string) error
 	IsOTPActive(ctx context.Context, id ulid.ULID) (bool, error)
 
+	HasRecoveryCodes(ctx context.Context, userID ulid.ULID) (bool, error)
+	GenerateRecoveryCodes(ctx context.Context, userID ulid.ULID) ([]string, error)
+	DeleteRecoveryCodes(ctx context.Context, userID ulid.ULID, password string) error
+
 	StartOAuthCodeFlow(ctx context.Context, clientID ulid.ULID, redirectURI *url.URL, responseType, scope, state, nonce string) error
 	GetAuthRequest(ctx context.Context) (AuthRequest, error)
 	OAuthConsent(ctx context.Context) (string, error)
@@ -562,8 +566,59 @@ func (a *authService) VerifyOTPCode(ctx context.Context, userID ulid.ULID, code 
 		return fmt.Errorf("verify otp code: %w", ErrInvalidCredentials)
 	}
 	if !totp.Validate(code, key.Secret()) {
+		err := a.userRepo.DeleteRecoveryCode(ctx, userID, hashToken(code))
+		if err == nil {
+			return nil
+		}
+		if !errors.Is(err, repos.ErrNoRecord) {
+			return fmt.Errorf("verify otp code: verify recovery code: %w", err)
+		}
 		return ErrInvalidCredentials
 	}
+	return nil
+}
+
+func (a *authService) HasRecoveryCodes(ctx context.Context, userID ulid.ULID) (bool, error) {
+	authUser := a.AuthenticatedUserID(ctx)
+	if userID == authUser && a.sessionManager.Exists(ctx, "recoveryCodeCount") {
+		return a.sessionManager.GetInt(ctx, "recoveryCodeCount") > 0, nil
+	}
+	count, err := a.userRepo.CountRecoveryCodes(ctx, userID)
+	fmt.Println(count)
+	if err != nil {
+		return false, fmt.Errorf("has recovery codes: %w", err)
+	}
+	if userID == authUser {
+		a.sessionManager.Put(ctx, "recoveryCodeCount", count)
+	}
+	return count > 0, err
+}
+
+func (a *authService) GenerateRecoveryCodes(ctx context.Context, userID ulid.ULID) ([]string, error) {
+	codes := make([]string, 10)
+	codeHashes := make([][]byte, 10)
+	for i := 0; i < 10; i++ {
+		codes[i] = generateToken(32)
+		codeHashes[i] = hashToken(codes[i])
+	}
+	err := a.userRepo.CreateRecoveryCodes(ctx, userID, codeHashes)
+	if err != nil {
+		return nil, fmt.Errorf("generate recovery codes: %w", err)
+	}
+	a.sessionManager.Put(ctx, "recoveryCodeCount", 10)
+	return codes, nil
+}
+
+func (a *authService) DeleteRecoveryCodes(ctx context.Context, userID ulid.ULID, password string) error {
+	err := a.VerifyPasswordByID(ctx, userID, password)
+	if err != nil {
+		return fmt.Errorf("delete recovery codes: %w", err)
+	}
+	err = a.userRepo.DeleteRecoveryCodes(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("delete recovery codes: %w", err)
+	}
+	a.sessionManager.Put(ctx, "recoveryCodeCount", 0)
 	return nil
 }
 
