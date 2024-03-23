@@ -21,7 +21,7 @@ ARG BUILDPLATFORM
 WORKDIR /
 COPY --from=build /app/bin/h-id /h-id
 
-ENV DB_CONNECTION=/data/database.sqlite
+ENV DB_CONNECTION=file:/data/database.sqlite?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(3000)
 ENV AUTO_MIGRATE=1
 ENV PORT=8080
 EXPOSE 8080
