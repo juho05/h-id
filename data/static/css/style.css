@@ -171,7 +171,7 @@ a {
   margin-left: auto;
   margin-right: auto;
   margin-top: 5%;
-  min-height: 75vh;
+  height: 75vh;
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -187,6 +187,7 @@ a {
 
 .form-title {
   font-size: 32pt;
+  text-align: center;
 }
 
 .form {
@@ -318,6 +319,7 @@ select:focus {
   padding: 8px 15px;
   cursor: pointer;
   border-radius: 6px;
+  text-decoration: none;
 }
 
 .btn-green {
@@ -394,6 +396,57 @@ textarea#recoveryCodes {
 }
 #recoveryCodesExplanation {
   text-align: center;
+}
+
+#list-apps-page {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+}
+
+#list-apps-page-body {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  min-height: 0;
+}
+
+#list-apps-create {
+  margin-top: 2vh;
+}
+
+#app-list {
+  margin-top: 1vh;
+  flex-grow: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+#appForm {
+  margin-top: -1vh;
+}
+
+.app-list-entry {
+  display: block;
+  text-decoration: none;
+  color: var(--foreground);
+  background-color: var(--input-background);
+  padding: 12px;
+  border-radius: 5px;
+  margin-top: 1vh;
+}
+
+#deleteAppBtn {
+  margin-top: 1.5vh;
+  display: inline-block;
+}
+
+#confirmForm {
+  text-align: center;
+}
+
+#cancel-btn {
+  text-decoration: underline;
 }
 
 @font-face {

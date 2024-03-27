@@ -1,0 +1,14 @@
+{{define "title"}}{{translate .Lang "areYouSure"}}{{end}}
+
+{{define "main"}}
+<div class="form-panel">
+  <h2 class="form-title">{{translate .Lang "areYouSure"}}</h2>
+  <form id="confirmForm" class="form" action="{{.Data.RedirectURL}}" method="POST">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+    <p class="hint-label-error" id="confirmText">{{translate .Lang "areYouSureYouWantToDelete1"}} {{.Data.Name}}{{translate .Lang "areYouSureYouWantToDelete2"}}</p>
+    <input type="submit" class="btn btn-red" value="{{translate .Lang "delete"}}"/>
+  </form>
+  <a class="clickable" id="cancel-btn">{{translate .Lang "cancel"}}</a>
+  <script src="/static/js/confirmDelete.js"></script>
+</div>
+{{end}}

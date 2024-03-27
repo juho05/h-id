@@ -102,9 +102,11 @@ func (r *renderer) loadTemplates(htmlFS fs.FS) error {
 			return fmt.Errorf("parse base.tmpl.html: %w", err)
 		}
 
-		t, err = t.ParseFS(htmlFS, "partials/*.tmpl.html")
-		if err != nil {
-			return fmt.Errorf("parse template partials: %w", err)
+		if partials, err := fs.ReadDir(htmlFS, "partials"); err == nil && len(partials) > 0 {
+			t, err = t.ParseFS(htmlFS, "partials/*.tmpl.html")
+			if err != nil {
+				return fmt.Errorf("parse template partials: %w", err)
+			}
 		}
 
 		t, err = t.ParseFS(htmlFS, page)

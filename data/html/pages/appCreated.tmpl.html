@@ -1,0 +1,24 @@
+{{define "title"}}{{translate .Lang "created"}}{{end}}
+
+{{define "main"}}
+<div class="form-panel">
+  <h2 class="form-title">{{translate .Lang "created"}}</h2>
+  <form class="form">
+    <div>
+      <label class="input-label" for="name">{{translate .Lang "name"}}:</label>
+      <input id="name" type="text" name="name" value="{{.Data.Name}}" required readonly>
+
+      <label class="input-label" for="id">{{translate .Lang "id"}}:</label>
+      <input id="id" type="text" name="id" value="{{.Data.ID}}" required readonly>
+
+      <label class="input-label" for="secret">{{translate .Lang "secret"}}:</label>
+      <input id="secret" type="text" name="secret" value="{{.Data.Secret}}" required readonly>
+
+      <label class="hint-label hint-label-warning" id="clientSecretWarning">{{translate .Lang "clientSecretWarning"}}</label>
+    </div>
+    <div class="submit-div">
+      <a class="btn" href="/app/list">{{translate .Lang "done"}}</a>
+    </div>
+  </form>
+</div>
+{{end}}

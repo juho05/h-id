@@ -321,10 +321,30 @@ func (u *URL) UnmarshalText(text []byte) error {
 	return nil
 }
 
+func stringsToStdURLs(urls []string) ([]*url.URL, error) {
+	std := make([]*url.URL, len(urls))
+	var err error
+	for i, u := range urls {
+		std[i], err = url.Parse(u)
+		if err != nil {
+			return nil, fmt.Errorf("strings to std urls: %w", err)
+		}
+	}
+	return std, nil
+}
+
 func urlsToStdURLs(urls []URL) []*url.URL {
 	std := make([]*url.URL, len(urls))
 	for i, u := range urls {
 		std[i] = u.URL
 	}
 	return std
+}
+
+func urlsToStrings(urls []*url.URL) []string {
+	strings := make([]string, len(urls))
+	for i, u := range urls {
+		strings[i] = u.String()
+	}
+	return strings
 }
