@@ -35,6 +35,18 @@ func Local() (b bool) {
 	return b
 }
 
+func BehindProxy() (b bool) {
+	if c, ok := values["BEHIND_PROXY"]; ok {
+		return c.(bool)
+	}
+	defer func() {
+		values["BEHIND_PROXY"] = b
+	}()
+	str := os.Getenv("BEHIND_PROXY")
+	b, _ = strconv.ParseBool(str)
+	return b
+}
+
 func Port() (port int) {
 	if p, ok := values["PORT"]; ok {
 		return p.(int)

@@ -15,6 +15,8 @@ import (
 	"github.com/juho05/log"
 	"github.com/justinas/nosurf"
 	"github.com/oklog/ulid/v2"
+	"github.com/sethvargo/go-limiter/httplimit"
+	"github.com/sethvargo/go-limiter/memorystore"
 
 	hid "github.com/juho05/h-id"
 
@@ -225,4 +227,23 @@ func corsHeaders(next http.Handler) http.Handler {
 		MaxAge:           int((15 * time.Minute).Seconds()),
 	})
 	return handler(next)
+}
+
+func rateLimit(tokens int, interval time.Duration) func(next http.Handler) http.Handler {
+	store, err := memorystore.New(&memorystore.Config{
+		Tokens:   uint64(tokens),
+		Interval: interval,
+	})
+	if err != nil {
+		panic("init rate limit store: " + err.Error())
+	}
+	var headers []string
+	if config.BehindProxy() {
+		headers = append(headers, "X-Forwarded-For")
+	}
+	mware, err := httplimit.NewMiddleware(store, httplimit.IPKeyFunc(headers...))
+	if err != nil {
+		panic("init rate limit middleware: " + err.Error())
+	}
+	return mware.Handle
 }

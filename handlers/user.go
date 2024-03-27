@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/disintegration/imaging"
 	"github.com/go-chi/chi/v5"
@@ -31,36 +32,36 @@ func (h *Handler) userRoutes(r chi.Router) {
 		})
 	})
 	r.With(h.noauth).Get("/signup", h.userSignUpPage)
-	r.With(h.noauth).Post("/signup", h.userSignUp)
+	r.With(h.noauth, rateLimit(1, time.Second)).Post("/signup", h.userSignUp)
 	r.With(h.noauth).Get("/login", h.userLoginPage)
-	r.With(h.noauth).Post("/login", h.userLogin)
+	r.With(h.noauth, rateLimit(2, 1*time.Second)).Post("/login", h.userLogin)
 	r.With(h.noauth).Get("/forgotPassword", h.forgotPasswordPage)
-	r.With(h.noauth).Post("/forgotPassword", h.forgotPassword)
+	r.With(h.noauth, rateLimit(3, 20*time.Second)).Post("/forgotPassword", h.forgotPassword)
 	r.With(h.noauth).Get("/resetPassword", h.resetPasswordPage)
-	r.With(h.noauth).Post("/resetPassword", h.resetPassword)
+	r.With(h.noauth, rateLimit(2, 10*time.Second)).Post("/resetPassword", h.resetPassword)
 	r.With(h.auth).Post("/logout", h.userLogout)
 
 	r.With(h.auth).Get("/confirmEmail", h.userConfirmEmailPage)
-	r.With(h.auth).Post("/confirmEmail", h.userConfirmEmail)
+	r.With(h.auth, rateLimit(2, time.Second)).Post("/confirmEmail", h.userConfirmEmail)
 
 	r.Get("/2fa/otp/activate", h.userActivateOTPPage)
-	r.Post("/2fa/otp/activate", h.userActivateOTP)
+	r.With(rateLimit(2, time.Second)).Post("/2fa/otp/activate", h.userActivateOTP)
 	r.Get("/2fa/otp/activate/qr", h.userActivateOTPQRCode)
 
 	r.With(h.auth).Get("/2fa/recovery", h.recoveryCodesPage)
 	r.With(h.auth).Post("/2fa/recovery", h.recoveryCodes)
 	r.With(h.auth).Get("/2fa/recovery/reset", h.newPage("resetRecoveryCodes"))
-	r.With(h.auth).Post("/2fa/recovery/reset", h.resetRecoveryCodes)
+	r.With(h.auth, rateLimit(2, time.Second)).Post("/2fa/recovery/reset", h.resetRecoveryCodes)
 
 	r.With(h.noauth).Get("/2fa/otp/verify", h.verifyOTPPage)
-	r.With(h.noauth).Post("/2fa/otp/verify", h.verifyOTP)
+	r.With(h.noauth, rateLimit(2, time.Second)).Post("/2fa/otp/verify", h.verifyOTP)
 
 	r.With(corsHeaders).Get("/{id}/picture", h.profilePicture)
 	r.With(corsHeaders, h.oauth()).HandleFunc("/info", h.userInfo)
 
 	r.With(h.auth).Get("/changeEmail", h.changeEmailPage)
-	r.With(h.auth).Post("/changeEmail", h.changeEmail)
-	r.With(h.auth).Get("/updateEmail", h.updateEmail)
+	r.With(h.auth, rateLimit(2, time.Second)).Post("/changeEmail", h.changeEmail)
+	r.With(h.auth, rateLimit(2, 20*time.Second)).Get("/updateEmail", h.updateEmail)
 	r.With(h.auth).Get("/profile", h.userProfile)
 	r.With(h.auth).Post("/profile", h.updateUserProfile)
 }

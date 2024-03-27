@@ -1,8 +1,8 @@
 module github.com/juho05/h-id
 
-go 1.21
+go 1.22
 
-toolchain go1.21.3
+toolchain go1.22.1
 
 require (
 	github.com/alexedwards/scs/v2 v2.8.0
@@ -20,6 +20,7 @@ require (
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/pquerna/otp v1.4.0
 	github.com/rubenv/sql-migrate v1.6.1
+	github.com/sethvargo/go-limiter v1.0.0
 	github.com/xdg-go/pbkdf2 v1.0.0
 	golang.org/x/crypto v0.21.0
 	golang.org/x/exp v0.0.0-20240318143956-a85f2c67cd81
