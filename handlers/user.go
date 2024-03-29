@@ -310,7 +310,8 @@ func (h *Handler) verifyOTPPage(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
-	if !active {
+	remember2FAErr := h.AuthService.VerifyRemember2FACookie(r.Context(), userID, r)
+	if !active || remember2FAErr == nil {
 		err = h.AuthService.Login(r.Context(), userID)
 		if err != nil {
 			serverError(w, err)
@@ -367,6 +368,13 @@ func (h *Handler) verifyOTP(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
+
+	remember2FACookie, err := h.AuthService.CreateRemember2FACookie(r.Context(), userID)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	http.SetCookie(w, remember2FACookie)
 
 	if redirect := h.SessionManager.PopString(r.Context(), "loginRedirect"); redirect != "" {
 		http.Redirect(w, r, redirect, http.StatusSeeOther)

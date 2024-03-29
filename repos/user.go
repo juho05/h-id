@@ -43,6 +43,10 @@ type UserRepository interface {
 	CountRecoveryCodes(ctx context.Context, userID ulid.ULID) (int, error)
 	DeleteRecoveryCode(ctx context.Context, userID ulid.ULID, codeHash []byte) error
 	DeleteRecoveryCodes(ctx context.Context, userID ulid.ULID) error
+	CreateRemember2FAToken(ctx context.Context, userID ulid.ULID, codeHash []byte, lifetime time.Duration) error
+	DeleteRemember2FAToken(ctx context.Context, userID ulid.ULID, codeHash []byte) error
+	DeleteRemember2FATokens(ctx context.Context, userID ulid.ULID) error
+	CheckRemember2FAToken(ctx context.Context, userID ulid.ULID, codeHash []byte) (bool, error)
 	CreatePasskey(ctx context.Context, userID ulid.ULID, name string, credential webauthn.Credential) error
 	GetPasskeys(ctx context.Context, userID ulid.ULID) ([]*Passkey, error)
 	GetPasskey(ctx context.Context, userID, id ulid.ULID) (*Passkey, error)

@@ -54,6 +54,13 @@ type RecoveryCode struct {
 	CodeHash  []byte
 }
 
+type Remember2fa struct {
+	CreatedAt int64
+	UserID    string
+	CodeHash  []byte
+	Expires   int64
+}
+
 type RsaKey struct {
 	Name      string
 	CreatedAt int64

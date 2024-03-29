@@ -63,6 +63,9 @@ type AuthService interface {
 	GenerateRecoveryCodes(ctx context.Context, userID ulid.ULID) ([]string, error)
 	DeleteRecoveryCodes(ctx context.Context, userID ulid.ULID, password string) error
 
+	CreateRemember2FACookie(ctx context.Context, userID ulid.ULID) (*http.Cookie, error)
+	VerifyRemember2FACookie(ctx context.Context, userID ulid.ULID, r *http.Request) error
+
 	PasskeyBeginRegistration(ctx context.Context, user *repos.UserModel, password, passkeyName string) (*protocol.CredentialCreation, error)
 	PasskeyFinishRegistration(ctx context.Context, user *repos.UserModel, req *http.Request) error
 	PasskeyBeginLogin(ctx context.Context) (*protocol.CredentialAssertion, error)
@@ -139,6 +142,9 @@ func NewAuthService(userRepository repos.UserRepository, tokenRepository repos.T
 			},
 		},
 	})
+	if err != nil {
+		return nil, err
+	}
 	a := &authService{
 		userRepo:       userRepository,
 		tokenRepo:      tokenRepository,
@@ -495,7 +501,15 @@ func (a *authService) UpdatePassword(ctx context.Context, userID ulid.ULID, pass
 	if err != nil {
 		return fmt.Errorf("update password: %w", err)
 	}
-	return a.userRepo.UpdatePassword(ctx, userID, passwordHash)
+	err = a.userRepo.UpdatePassword(ctx, userID, passwordHash)
+	if err != nil {
+		return err
+	}
+	err = a.userRepo.DeleteRemember2FATokens(ctx, userID)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (a *authService) AuthenticatedUserID(ctx context.Context) ulid.ULID {
@@ -645,6 +659,41 @@ func (a *authService) DeleteRecoveryCodes(ctx context.Context, userID ulid.ULID,
 		return fmt.Errorf("delete recovery codes: %w", err)
 	}
 	a.sessionManager.Put(ctx, "recoveryCodeCount", 0)
+	return nil
+}
+
+func (a *authService) CreateRemember2FACookie(ctx context.Context, userID ulid.ULID) (*http.Cookie, error) {
+	code := generateToken(64)
+	codeHash := hashToken(code)
+	lifetime := 6 * 30 * 24 * time.Hour
+	err := a.userRepo.CreateRemember2FAToken(ctx, userID, codeHash, lifetime)
+	if err != nil {
+		return nil, fmt.Errorf("create remember 2fa cookie: %w", err)
+	}
+	return &http.Cookie{
+		Name:     "remember-2fa",
+		Value:    code,
+		Path:     "/user/2fa",
+		Expires:  time.Now().Add(6 * 30 * 24 * time.Hour),
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+	}, nil
+}
+
+func (a *authService) VerifyRemember2FACookie(ctx context.Context, userID ulid.ULID, r *http.Request) error {
+	cookie, err := r.Cookie("remember-2fa")
+	if err != nil {
+		return ErrInvalidCredentials
+	}
+	tokenHash := hashToken(cookie.Value)
+	exists, err := a.userRepo.CheckRemember2FAToken(ctx, userID, tokenHash)
+	if err != nil {
+		return fmt.Errorf("verify remember 2fa cookie: %w", err)
+	}
+	if !exists {
+		return ErrInvalidCredentials
+	}
 	return nil
 }
 

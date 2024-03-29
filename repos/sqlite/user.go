@@ -268,6 +268,44 @@ func (u *userRepository) DeleteRecoveryCodes(ctx context.Context, userID ulid.UL
 	return repoErrResult("delete recovery codes: %w", res, err)
 }
 
+func (u *userRepository) CreateRemember2FAToken(ctx context.Context, userID ulid.ULID, codeHash []byte, lifetime time.Duration) error {
+	err := u.db.CreateRemember2FAToken(ctx, db.CreateRemember2FATokenParams{
+		CreatedAt: time.Now().Unix(),
+		UserID:    userID.String(),
+		CodeHash:  codeHash,
+		Expires:   time.Now().Add(lifetime).Unix(),
+	})
+	return repoErr("create remember 2fa token: %w", err)
+}
+
+func (u *userRepository) DeleteRemember2FAToken(ctx context.Context, userID ulid.ULID, codeHash []byte) error {
+	res, err := u.db.DeleteRemember2FAToken(ctx, db.DeleteRemember2FATokenParams{
+		UserID:   userID.String(),
+		CodeHash: codeHash,
+	})
+	return repoErrResult("delete remember 2fa token: %w", res, err)
+}
+
+func (u *userRepository) DeleteRemember2FATokens(ctx context.Context, userID ulid.ULID) error {
+	res, err := u.db.DeleteRemember2FATokens(ctx, db.DeleteRemember2FATokensParams{
+		UserID: userID.String(),
+		Now:    time.Now().Unix(),
+	})
+	return repoErrResult("delete remember 2fa tokens: %w", res, err)
+}
+
+func (u *userRepository) CheckRemember2FAToken(ctx context.Context, userID ulid.ULID, codeHash []byte) (bool, error) {
+	exists, err := u.db.CheckRemember2FAToken(ctx, db.CheckRemember2FATokenParams{
+		UserID:   userID.String(),
+		CodeHash: codeHash,
+		Now:      time.Now().Unix(),
+	})
+	if err != nil {
+		return false, repoErr("check remember 2fa token: %w", err)
+	}
+	return exists != 0, nil
+}
+
 func (u *userRepository) CreatePasskey(ctx context.Context, userID ulid.ULID, name string, credential webauthn.Credential) error {
 	cred, err := json.Marshal(credential)
 	if err != nil {
