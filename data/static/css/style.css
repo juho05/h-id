@@ -183,6 +183,9 @@ a {
     background: none;
     border: none;
   }
+  html{
+    background-color: var(--panel-background);
+  }
 }
 
 .form-title {
