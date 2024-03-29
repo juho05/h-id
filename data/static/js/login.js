@@ -35,16 +35,20 @@ passkeyBtn.addEventListener("click", async (e) => {
   const credential = await navigator.credentials.get({
     publicKey: authOptions.publicKey
   });
-  credential.toJSON = undefined;
-  credential.rawId = encode(credential.rawId);
-  credential.response.authenticatorData = encode(credential.response.authenticatorData);
-  credential.response.clientDataJSON = encode(credential.response.clientDataJSON);
-  credential.response.signature = encode(credential.response.signature);
-  credential.response.userHandle = encode(credential.response.userHandle);
   console.log("passkey finish")
   const res2 = await fetch("/user/passkey/verify/finish", {
     method: "POST",
-    body: JSON.stringify(credential)
+    body: JSON.stringify({
+      id: credential.id,
+      type: credential.type,
+      rawId: encode(credential.rawId),
+      response: {
+        authenticatorData: encode(credential.response.authenticatorData),
+        signature: encode(credential.response.signature),
+        userHandle: encode(credential.response.userHandle),
+        clientDataJSON: encode(credential.response.clientDataJSON)
+      }
+    })
   });
   if (res2.status !== 200) {
     if (res2.status === 401) {

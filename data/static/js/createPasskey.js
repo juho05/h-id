@@ -48,13 +48,17 @@ form.addEventListener("submit", async (e) => {
     }
   });
   if (!webAuthnResponse) return;
-  webAuthnResponse.toJSON = undefined;
-  webAuthnResponse.rawId = encode(webAuthnResponse.rawId);
-  webAuthnResponse.response.attestationObject = encode(webAuthnResponse.response.attestationObject);
-  webAuthnResponse.response.clientDataJSON = encode(webAuthnResponse.response.clientDataJSON);
   const res2 = await fetch("/user/passkey/create/finish", {
     method: "POST",
-    body: JSON.stringify(webAuthnResponse)
+    body: JSON.stringify({
+      id: webAuthnResponse.id,
+      type: webAuthnResponse.type,
+      rawId: encode(webAuthnResponse.rawId),
+      response: {
+        attestationObject: encode(webAuthnResponse.response.attestationObject),
+        clientDataJSON: encode(webAuthnResponse.response.clientDataJSON)
+      }
+    })
   });
   if (res2.status !== 201) {
     alert("ERROR: status: " + res2.status);

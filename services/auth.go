@@ -611,7 +611,6 @@ func (a *authService) HasRecoveryCodes(ctx context.Context, userID ulid.ULID) (b
 		return a.sessionManager.GetInt(ctx, "recoveryCodeCount") > 0, nil
 	}
 	count, err := a.userRepo.CountRecoveryCodes(ctx, userID)
-	fmt.Println(count)
 	if err != nil {
 		return false, fmt.Errorf("has recovery codes: %w", err)
 	}
@@ -681,7 +680,7 @@ func (a *authService) PasskeyFinishRegistration(ctx context.Context, user *repos
 	webAuthnUser := a.newWebAuthnUser(user)
 	credential, err := a.webAuthn.FinishRegistration(webAuthnUser, sessionData, req)
 	if err != nil {
-		fmt.Println(err.(*protocol.Error).DevInfo)
+		log.Error(err.(*protocol.Error).DevInfo)
 		return fmt.Errorf("finish webauthn registration: finish registration: %w", ErrInvalidCredentials)
 	}
 	return a.userRepo.CreatePasskey(ctx, user.ID, name, *credential)
