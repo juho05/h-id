@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"image/jpeg"
@@ -55,6 +56,17 @@ func (h *Handler) userRoutes(r chi.Router) {
 
 	r.With(h.noauth).Get("/2fa/otp/verify", h.verifyOTPPage)
 	r.With(h.noauth, rateLimit(2, time.Second)).Post("/2fa/otp/verify", h.verifyOTP)
+
+	r.With(h.auth).Get("/passkey", h.listPasskeys)
+	r.With(h.auth).Get("/passkey/{passkeyID}", h.getPasskey)
+	r.With(h.auth).Post("/passkey/{passkeyID}/update", h.updatePasskey)
+	r.With(h.auth).Post("/passkey/{passkeyID}/delete", h.deletePasskey)
+	r.With(h.auth).Get("/passkey/create", h.newPage("createPasskey"))
+	r.With(h.auth).Post("/passkey/create/begin", h.createPasskeyBegin)
+	r.With(h.auth).Post("/passkey/create/finish", h.createPasskeyFinish)
+
+	r.With(h.noauth).Post("/passkey/verify/begin", h.verifyPasskeyBegin)
+	r.With(h.noauth).Post("/passkey/verify/finish", h.verifyPasskeyFinish)
 
 	r.With(corsHeaders).Get("/{id}/picture", h.profilePicture)
 	r.With(corsHeaders, h.oauth()).HandleFunc("/info", h.userInfo)
@@ -361,6 +373,213 @@ func (h *Handler) verifyOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+}
+
+// GET /user/passkey
+func (h *Handler) listPasskeys(w http.ResponseWriter, r *http.Request) {
+	type passkey struct {
+		ID   string
+		Name string
+	}
+	type data struct {
+		Passkeys []passkey
+	}
+	passkeys, err := h.UserService.GetPasskeys(r.Context(), h.AuthService.AuthenticatedUserID(r.Context()))
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	pkeys := make([]passkey, len(passkeys))
+	for i, p := range passkeys {
+		pkeys[i] = passkey{
+			ID:   p.ID.String(),
+			Name: p.Name,
+		}
+	}
+	h.Renderer.render(w, r, http.StatusOK, "passkeys", h.newTemplateDataWithData(r, data{
+		Passkeys: pkeys,
+	}))
+}
+
+// GET /user/passkey/{passkeyID}
+func (h *Handler) getPasskey(w http.ResponseWriter, r *http.Request) {
+	passkeyID, err := ulid.Parse(chi.URLParam(r, "passkeyID"))
+	if err != nil {
+		clientError(w, http.StatusBadRequest)
+		return
+	}
+	passkey, err := h.UserService.GetPasskey(r.Context(), h.AuthService.AuthenticatedUserID(r.Context()), passkeyID)
+	if err != nil {
+		if errors.Is(err, repos.ErrNoRecord) {
+			clientError(w, http.StatusNotFound)
+		} else {
+			serverError(w, err)
+		}
+		return
+	}
+	type data struct {
+		ID        string
+		CreatedAt string
+	}
+	type form struct {
+		Name        string
+		EncodedName string
+	}
+	tmplData := h.newTemplateDataWithData(r, data{
+		ID:        passkey.ID.String(),
+		CreatedAt: passkey.CreatedAt.Format(time.DateTime + " MST"),
+	})
+	tmplData.Form = form{
+		Name:        passkey.Name,
+		EncodedName: url.QueryEscape(passkey.Name),
+	}
+	h.Renderer.render(w, r, http.StatusOK, "passkey", tmplData)
+}
+
+// POST /user/passkey/{passkeyID}/update
+func (h *Handler) updatePasskey(w http.ResponseWriter, r *http.Request) {
+	passkeyID, err := ulid.Parse(chi.URLParam(r, "passkeyID"))
+	if err != nil {
+		clientError(w, http.StatusBadRequest)
+		return
+	}
+	passkey, err := h.UserService.GetPasskey(r.Context(), h.AuthService.AuthenticatedUserID(r.Context()), passkeyID)
+	if err != nil {
+		if errors.Is(err, repos.ErrNoRecord) {
+			clientError(w, http.StatusNotFound)
+		} else {
+			serverError(w, err)
+		}
+		return
+	}
+	type data struct {
+		ID        string
+		CreatedAt string
+	}
+	tmplData := h.newTemplateDataWithData(r, data{
+		ID:        passkey.ID.String(),
+		CreatedAt: passkey.CreatedAt.Format(time.DateTime + " MST"),
+	})
+	type request struct {
+		Name string `form:"name" validate:"required,notblank,min=3,max=32"`
+	}
+	body, ok := decodeAndValidateBody[request](h, w, r, "passkey", &tmplData)
+	if !ok {
+		return
+	}
+
+	err = h.UserService.UpdatePasskey(r.Context(), h.AuthService.AuthenticatedUserID(r.Context()), passkeyID, body.Name)
+	if err != nil {
+		if errors.Is(err, repos.ErrNoRecord) {
+			clientError(w, http.StatusNotFound)
+		} else {
+			serverError(w, err)
+		}
+		return
+	}
+
+	http.Redirect(w, r, "/user/passkey/"+passkeyID.String(), http.StatusSeeOther)
+}
+
+// POST /user/passkey/{passkeyID}/delete
+func (h *Handler) deletePasskey(w http.ResponseWriter, r *http.Request) {
+	passkeyID, err := ulid.Parse(chi.URLParam(r, "passkeyID"))
+	if err != nil {
+		clientError(w, http.StatusBadRequest)
+		return
+	}
+	err = h.UserService.DeletePasskey(r.Context(), h.AuthService.AuthenticatedUserID(r.Context()), passkeyID)
+	if err != nil {
+		if errors.Is(err, repos.ErrNoRecord) {
+			clientError(w, http.StatusNotFound)
+		} else {
+			serverError(w, err)
+		}
+		return
+	}
+	http.Redirect(w, r, "/user/passkey", http.StatusSeeOther)
+}
+
+// POST /user/passkey/create/begin
+func (h *Handler) createPasskeyBegin(w http.ResponseWriter, r *http.Request) {
+	type request struct {
+		Name     string `form:"name" validate:"required,notblank,min=3,max=32"`
+		Password string `form:"password" validate:"required"`
+	}
+	var body request
+	err := json.NewDecoder(r.Body).Decode(&body)
+	if err != nil {
+		clientError(w, http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+	if err := validate.Struct(body); err != nil {
+		clientError(w, http.StatusBadRequest)
+		return
+	}
+	user, err := h.UserService.Find(r.Context(), h.AuthService.AuthenticatedUserID(r.Context()))
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	options, err := h.AuthService.PasskeyBeginRegistration(r.Context(), user, body.Password, body.Name)
+	if err != nil {
+		if errors.Is(err, services.ErrInvalidCredentials) {
+			clientError(w, http.StatusUnauthorized)
+		} else {
+			serverError(w, err)
+		}
+		return
+	}
+	respondJSON(w, http.StatusOK, options)
+}
+
+// POST /user/passkey/create/finish
+func (h *Handler) createPasskeyFinish(w http.ResponseWriter, r *http.Request) {
+	user, err := h.UserService.Find(r.Context(), h.AuthService.AuthenticatedUserID(r.Context()))
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	err = h.AuthService.PasskeyFinishRegistration(r.Context(), user, r)
+	if err != nil {
+		if errors.Is(err, services.ErrInvalidCredentials) {
+			clientError(w, http.StatusUnauthorized)
+		} else {
+			serverError(w, err)
+		}
+		return
+	}
+	respondJSON(w, http.StatusCreated, struct{}{})
+}
+
+// POST /user/passkey/verify/begin
+func (h *Handler) verifyPasskeyBegin(w http.ResponseWriter, r *http.Request) {
+	assertion, err := h.AuthService.PasskeyBeginLogin(r.Context())
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	respondJSON(w, http.StatusOK, assertion)
+}
+
+// POST /user/passkey/verify/finish
+func (h *Handler) verifyPasskeyFinish(w http.ResponseWriter, r *http.Request) {
+	user, err := h.AuthService.PasskeyFinishLogin(r.Context(), r)
+	if err != nil {
+		if errors.Is(err, services.ErrInvalidCredentials) {
+			clientError(w, http.StatusUnauthorized)
+		} else {
+			serverError(w, err)
+		}
+		return
+	}
+	err = h.AuthService.Login(r.Context(), user.ID)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	respondJSON(w, http.StatusOK, struct{}{})
 }
 
 // POST /user/logout

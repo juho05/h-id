@@ -34,6 +34,10 @@ type UserService interface {
 	ProfilePictureETag(userID ulid.ULID, size int) string
 	RequestChangeEmail(ctx context.Context, lang string, user *repos.UserModel, newEmail string) error
 	ChangeEmail(ctx context.Context, lang, token string) (string, error)
+	GetPasskeys(ctx context.Context, userID ulid.ULID) ([]*repos.Passkey, error)
+	GetPasskey(ctx context.Context, userID, id ulid.ULID) (*repos.Passkey, error)
+	UpdatePasskey(ctx context.Context, userID, id ulid.ULID, name string) error
+	DeletePasskey(ctx context.Context, userID, id ulid.ULID) error
 	Delete(ctx context.Context, id ulid.ULID, password string) error
 }
 
@@ -183,6 +187,22 @@ func (u *userService) ChangeEmail(ctx context.Context, lang, token string) (stri
 
 func profilePicturePath(userID ulid.ULID) string {
 	return filepath.Join(config.ProfilePictureDir(), base64.URLEncoding.EncodeToString(userID.Bytes())) + ".jpg"
+}
+
+func (u *userService) GetPasskeys(ctx context.Context, userID ulid.ULID) ([]*repos.Passkey, error) {
+	return u.userRepo.GetPasskeys(ctx, userID)
+}
+
+func (u *userService) GetPasskey(ctx context.Context, userID, id ulid.ULID) (*repos.Passkey, error) {
+	return u.userRepo.GetPasskey(ctx, userID, id)
+}
+
+func (u *userService) UpdatePasskey(ctx context.Context, userID, id ulid.ULID, name string) error {
+	return u.userRepo.UpdatePasskey(ctx, userID, id, name)
+}
+
+func (u *userService) DeletePasskey(ctx context.Context, userID, id ulid.ULID) error {
+	return u.userRepo.DeletePasskey(ctx, userID, id)
 }
 
 func (u *userService) Delete(ctx context.Context, id ulid.ULID, password string) error {

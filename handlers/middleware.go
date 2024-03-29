@@ -84,6 +84,7 @@ func recoverPanic(next http.Handler) http.Handler {
 
 func csrf(next http.Handler) http.Handler {
 	handler := nosurf.New(next)
+	handler.ExemptGlobs("/user/passkey/create/*", "/user/passkey/verify/*")
 	handler.SetBaseCookie(http.Cookie{
 		HttpOnly: true,
 		Path:     "/",

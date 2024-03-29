@@ -1,0 +1,28 @@
+{{define "title"}}{{translate .Lang "createPasskey"}}{{end}}
+
+{{define "main"}}
+<div class="form-panel">
+  <h2 class="form-title">{{translate .Lang "createPasskey"}}</h2>
+  {{with .Errors}}
+  <ul class="error-list">
+    {{range .}}
+    <li>{{.}}</li>
+    {{end}}
+  </ul>
+  {{end}}
+  <form id="create-passkey-form" class="form">
+    <div>
+      <label class="input-label" for="name">{{translate .Lang "name"}}:</label>
+      <input id="name" type="text" name="name" minlength="3" maxlength="32" required>
+
+      <label class="input-label" for="password">{{translate .Lang "password"}}:</label>
+      <input id="password" type="password" name="password" required>
+      <label id="wrong-password" class="error-label invisible" for="password">{{translate .Lang "wrongPassword"}}</label>
+    </div>
+    <div class="submit-div">
+      <input class="btn" type="submit" value="{{translate .Lang "create"}}">
+    </div>
+  </form>
+  <script type="module" src="/static/js/createPasskey.js"></script>
+</div>
+{{end}}

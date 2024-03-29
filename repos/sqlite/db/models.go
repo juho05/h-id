@@ -32,6 +32,15 @@ type Oauth struct {
 	Used        bool
 }
 
+type Passkey struct {
+	ID         string
+	CredID     []byte
+	Name       string
+	CreatedAt  int64
+	UserID     string
+	Credential []byte
+}
+
 type Permission struct {
 	CreatedAt int64
 	ClientID  string

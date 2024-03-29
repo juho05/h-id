@@ -22,6 +22,8 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/alexedwards/scs/v2"
+	"github.com/go-webauthn/webauthn/protocol"
+	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/oklog/ulid/v2"
 	"github.com/pquerna/otp"
@@ -61,6 +63,11 @@ type AuthService interface {
 	GenerateRecoveryCodes(ctx context.Context, userID ulid.ULID) ([]string, error)
 	DeleteRecoveryCodes(ctx context.Context, userID ulid.ULID, password string) error
 
+	PasskeyBeginRegistration(ctx context.Context, user *repos.UserModel, password, passkeyName string) (*protocol.CredentialCreation, error)
+	PasskeyFinishRegistration(ctx context.Context, user *repos.UserModel, req *http.Request) error
+	PasskeyBeginLogin(ctx context.Context) (*protocol.CredentialAssertion, error)
+	PasskeyFinishLogin(ctx context.Context, req *http.Request) (*repos.UserModel, error)
+
 	StartOAuthCodeFlow(ctx context.Context, clientID ulid.ULID, redirectURI *url.URL, responseType, scope, state, nonce string) error
 	GetAuthRequest(ctx context.Context) (AuthRequest, error)
 	OAuthConsent(ctx context.Context) (string, error)
@@ -88,6 +95,7 @@ func init() {
 
 	gob.Register(ulid.ULID{})
 	gob.Register(AuthRequest{})
+	gob.Register(webauthn.SessionData{})
 }
 
 type authService struct {
@@ -98,6 +106,7 @@ type authService struct {
 	systemRepo     repos.SystemRepository
 	sessionManager *scs.SessionManager
 	emailService   EmailService
+	webAuthn       *webauthn.WebAuthn
 
 	jwtKeyPriv *rsa.PrivateKey
 	jwtKeyPub  *rsa.PublicKey
@@ -113,6 +122,23 @@ type AuthRequest struct {
 }
 
 func NewAuthService(userRepository repos.UserRepository, tokenRepository repos.TokenRepository, oauthRepository repos.OAuthRepository, clientRepository repos.ClientRepository, systemRepository repos.SystemRepository, sessionManager *scs.SessionManager, emailService EmailService) (AuthService, error) {
+	webAuthn, err := webauthn.New(&webauthn.Config{
+		RPDisplayName: "H-ID",
+		RPID:          config.Domain(),
+		RPOrigins:     []string{config.BaseURL()},
+		Timeouts: webauthn.TimeoutsConfig{
+			Login: webauthn.TimeoutConfig{
+				Enforce:    true,
+				Timeout:    3 * time.Minute,
+				TimeoutUVD: 3 * time.Minute,
+			},
+			Registration: webauthn.TimeoutConfig{
+				Enforce:    true,
+				Timeout:    3 * time.Minute,
+				TimeoutUVD: 3 * time.Minute,
+			},
+		},
+	})
 	a := &authService{
 		userRepo:       userRepository,
 		tokenRepo:      tokenRepository,
@@ -121,8 +147,9 @@ func NewAuthService(userRepository repos.UserRepository, tokenRepository repos.T
 		systemRepo:     systemRepository,
 		sessionManager: sessionManager,
 		emailService:   emailService,
+		webAuthn:       webAuthn,
 	}
-	err := a.initKeys(context.Background())
+	err = a.initKeys(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -620,6 +647,84 @@ func (a *authService) DeleteRecoveryCodes(ctx context.Context, userID ulid.ULID,
 	}
 	a.sessionManager.Put(ctx, "recoveryCodeCount", 0)
 	return nil
+}
+
+func (a *authService) PasskeyBeginRegistration(ctx context.Context, user *repos.UserModel, password, name string) (*protocol.CredentialCreation, error) {
+	err := a.VerifyPasswordByID(ctx, user.ID, password)
+	if err != nil {
+		return nil, fmt.Errorf("begin webauthn registration: %w", err)
+	}
+	webAuthnUser := a.newWebAuthnUser(user)
+	t := true
+	options, session, err := a.webAuthn.BeginRegistration(webAuthnUser, webauthn.WithAuthenticatorSelection(protocol.AuthenticatorSelection{
+		AuthenticatorAttachment: protocol.Platform,
+		ResidentKey:             protocol.ResidentKeyRequirementRequired,
+		RequireResidentKey:      &t,
+	}))
+	if err != nil {
+		return nil, fmt.Errorf("begin webauthn registration: %w", err)
+	}
+	a.sessionManager.Put(ctx, fmt.Sprintf("webAuthnRegistration:%s", user.ID), *session)
+	a.sessionManager.Put(ctx, fmt.Sprintf("webAuthnRegistrationName:%s", user.ID), name)
+	return options, err
+}
+
+func (a *authService) PasskeyFinishRegistration(ctx context.Context, user *repos.UserModel, req *http.Request) error {
+	sessionData, ok := a.sessionManager.Pop(ctx, fmt.Sprintf("webAuthnRegistration:%s", user.ID)).(webauthn.SessionData)
+	if !ok {
+		return fmt.Errorf("finish webauthn registration: %w", ErrInvalidCredentials)
+	}
+	name := a.sessionManager.PopString(ctx, fmt.Sprintf("webAuthnRegistrationName:%s", user.ID))
+	if name == "" {
+		return errors.New("invalid passkey name in session data")
+	}
+	webAuthnUser := a.newWebAuthnUser(user)
+	credential, err := a.webAuthn.FinishRegistration(webAuthnUser, sessionData, req)
+	if err != nil {
+		fmt.Println(err.(*protocol.Error).DevInfo)
+		return fmt.Errorf("finish webauthn registration: finish registration: %w", ErrInvalidCredentials)
+	}
+	return a.userRepo.CreatePasskey(ctx, user.ID, name, *credential)
+}
+
+func (a *authService) PasskeyBeginLogin(ctx context.Context) (*protocol.CredentialAssertion, error) {
+	assertion, session, err := a.webAuthn.BeginDiscoverableLogin()
+	if err != nil {
+		return nil, fmt.Errorf("begin passkey login: %w", err)
+	}
+	a.sessionManager.Put(ctx, "webAuthnLogin", *session)
+	return assertion, nil
+}
+
+func (a *authService) PasskeyFinishLogin(ctx context.Context, req *http.Request) (*repos.UserModel, error) {
+	sessionData, ok := a.sessionManager.Pop(ctx, "webAuthnLogin").(webauthn.SessionData)
+	if !ok {
+		return nil, fmt.Errorf("finish webauthn login: %w", ErrInvalidCredentials)
+	}
+	var user *repos.UserModel
+	credential, err := a.webAuthn.FinishDiscoverableLogin(func(rawID, userHandle []byte) (webauthn.User, error) {
+		if len(userHandle) != 16 {
+			return nil, fmt.Errorf("find user by webauthn user handle: invalid user handle length")
+		}
+		userID := ulid.ULID(userHandle)
+		var err error
+		user, err = a.userRepo.Find(ctx, userID)
+		if err != nil {
+			return nil, fmt.Errorf("find user by webauthn user handle: find user in db: %w", err)
+		}
+		return a.newWebAuthnUser(user), nil
+	}, sessionData, req)
+	if err != nil {
+		return nil, fmt.Errorf("finish webauthn login: finish discoverable login: %w", ErrInvalidCredentials)
+	}
+	if user == nil {
+		return nil, fmt.Errorf("finish webauthn login: find user: %w", ErrInvalidCredentials)
+	}
+	err = a.userRepo.UpdatePasskeyCredential(ctx, user.ID, *credential)
+	if err != nil {
+		return nil, fmt.Errorf("finish webauthn login: update user credentials: %w", err)
+	}
+	return user, nil
 }
 
 func (a *authService) VerifyUsernamePassword(ctx context.Context, email, password string) (*repos.UserModel, error) {

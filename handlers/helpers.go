@@ -181,6 +181,9 @@ func decodeAndValidateBodyWithCaptcha[T any](handler *Handler, w http.ResponseWr
 }
 
 func decodeBody[T any](r *http.Request) (T, error) {
+	if r.Body != nil {
+		defer r.Body.Close()
+	}
 	var obj T
 
 	var err error
@@ -195,7 +198,6 @@ func decodeBody[T any](r *http.Request) (T, error) {
 	}
 
 	err = formDecoder.Decode(&obj, r.PostForm)
-	r.Body.Close()
 	var invalidDecoderError *form.InvalidDecoderError
 	if errors.As(err, &invalidDecoderError) {
 		panic(err)

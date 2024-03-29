@@ -1,6 +1,7 @@
 package config
 
 import (
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -267,6 +268,15 @@ func BaseURL() (u string) {
 		log.Fatal("BASE_URL must not be empty")
 	}
 	return strings.TrimSuffix(u, "/")
+}
+
+func Domain() (d string) {
+	u, err := url.Parse(BaseURL())
+	if err != nil {
+		log.Errorf("Invalid base URL: %w. Using raw base URL as domain value.")
+		return BaseURL()
+	}
+	return u.Hostname()
 }
 
 func HCaptchaSiteKey() (key string) {

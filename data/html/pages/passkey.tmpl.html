@@ -1,0 +1,32 @@
+{{define "title"}}{{translate .Lang "passkey"}}{{end}}
+
+{{define "main"}}
+<div class="form-panel">
+  <h2 class="form-title">{{translate .Lang "passkey"}}</h2>
+  {{with .Errors}}
+  <ul class="error-list">
+    {{range .}}
+    <li>{{.}}</li>
+    {{end}}
+  </ul>
+  {{end}}
+  <form id="appForm" class="form" action="/user/passkey/{{.Data.ID}}/update" method="POST">
+    <div>
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <input type="hidden" name="encodedName" value="{{.Form.EncodedName}}">
+
+      <label class="input-label" for="name">{{translate .Lang "name"}}:</label>
+      <input class="{{if .FieldErrors.Name}}invalid-field{{end}}" id="name" type="text" name="name" {{with .Form}}value="{{.Name}}"{{end}} required>
+      {{with .FieldErrors.Name}}<label class="error-label" for="name">{{.}}</label>{{end}}
+
+      <label class="input-label" for="createdAt">{{translate .Lang "createdAt"}}:</label>
+      <input id="createdAt" type="text" name="createdAt" value="{{.Data.CreatedAt}}" disabled>
+
+      <a id="deleteAppBtn" href="/confirm?type=delete&name={{.Form.EncodedName}}&url=/user/passkey/{{.Data.ID}}/delete">{{translate .Lang "delete"}}</a>
+    </div>
+    <div class="submit-div">
+      <input class="btn" type="submit" value="{{translate .Lang "update"}}">
+    </div>
+  </form>
+</div>
+{{end}}

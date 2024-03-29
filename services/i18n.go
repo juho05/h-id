@@ -93,6 +93,13 @@ var translations = map[string]map[string]string{
 		"clientSecretWarning":        "This is the only time you will be shown the client secret. Copy it now and store it somewhere safe.",
 		"done":                       "Done",
 		"secret":                     "Secret",
+		"managePasskeys":             "Manage passkeys",
+		"passkeys":                   "Passkeys",
+		"passkey":                    "Passkey",
+		"createPasskey":              "Create Passkey",
+		"createdAt":                  "Created at",
+		"usePasskey":                 "Use passkey",
+		"or":                         "or",
 	},
 	"de": {
 		"submit":                     "Submit",
@@ -180,6 +187,13 @@ var translations = map[string]map[string]string{
 		"clientSecretWarning":        "Dies ist das einzige Mal, dass dir das Client Secret gezeigt wird. Kopiere es jetzt und verwahre es sicher.",
 		"done":                       "Fertig",
 		"secret":                     "Secret",
+		"managePasskeys":             "Passkeys verwalten",
+		"passkeys":                   "Passkeys",
+		"passkey":                    "Passkey",
+		"createPasskey":              "Passkey Erstellen",
+		"createdAt":                  "Erstellt am",
+		"usePasskey":                 "Passkey verwenden",
+		"or":                         "oder",
 	},
 }
 

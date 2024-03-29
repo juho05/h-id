@@ -3,16 +3,18 @@
 {{define "main"}}
 <div class="form-panel">
   <h2 class="form-title">{{translate .Lang "login"}}</h2>
-  {{with .Errors}}
-  <ul class="error-list">
-    {{range .}}
+  <ul id="login-error-list" class="error-list {{if not .Errors}}invisible{{end}}">
+    <li class="invisible" id="invalid-credentials">{{translate .Lang "invalidCredentials"}}</li>
+    {{range .Errors}}
     <li>{{.}}</li>
     {{end}}
   </ul>
-  {{end}}
   <form class="form" action="/user/login" method="POST">
     <div>
       <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+      <button id="use-passkey-btn" type="button" class="btn">{{translate .Lang "usePasskey"}}</button>
+      <label class="or-label">-- {{translate .Lang "or"}} --</label>
 
       <label class="input-label" for="email">{{translate .Lang "email"}}:</label>
       <input class="{{if .FieldErrors.Email}}invalid-field{{end}}" id="email" type="email" name="email" {{with .Form}}value="{{.Email}}"{{end}} {{if not .Form.Email}}autofocus{{end}} required>
@@ -29,5 +31,6 @@
       <input class="btn" type="submit" value="{{translate .Lang "login"}}">
     </div>
   </form>
+  <script src="/static/js/login.js"></script>
 </div>
 {{end}}

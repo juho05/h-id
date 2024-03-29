@@ -130,7 +130,7 @@ a {
 
 #profilePage #email {
   display: block;
-  width: calc(100% - 16px);
+  width: calc(100% - 18px);
   padding: 8px;
   margin-left: 0;
   margin-right: 0;
@@ -247,7 +247,7 @@ input[type=date],
 input[type=url],
 input[type=email] {
   display: block;
-  width: calc(100% - 16px);
+  width: calc(100% - 18px);
   padding: 8px;
   margin-left: 0;
   margin-right: 0;
@@ -266,7 +266,7 @@ input:disabled {
 
 #otp-secret {
   display: block;
-  width: calc(100% - 16px);
+  width: calc(100% - 18px);
   padding: 8px;
   margin-left: 0;
   margin-right: 0;
@@ -447,6 +447,20 @@ textarea#recoveryCodes {
 
 #cancel-btn {
   text-decoration: underline;
+}
+
+#use-passkey-btn {
+  display: block;
+  width: 100%;
+}
+
+.or-label {
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-size: 20px;
+  margin-top: 2%;
+  margin-bottom: -1%;
 }
 
 @font-face {

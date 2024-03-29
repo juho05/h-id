@@ -3,10 +3,12 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
+	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/oklog/ulid/v2"
 	"github.com/pquerna/otp"
 
@@ -50,6 +52,31 @@ func repoUser(user db.User) (*repos.UserModel, error) {
 		PasswordHash:   user.PasswordHash,
 		OTPActive:      user.OtpActive,
 		OTPKey:         otpKey,
+	}, nil
+}
+
+func repoPasskey(passkey db.Passkey) (*repos.Passkey, error) {
+	id, err := ulid.Parse(passkey.ID)
+	if err != nil {
+		return nil, err
+	}
+	userID, err := ulid.Parse(passkey.UserID)
+	if err != nil {
+		return nil, err
+	}
+	var credential webauthn.Credential
+	err = json.Unmarshal(passkey.Credential, &credential)
+	if err != nil {
+		return nil, err
+	}
+	return &repos.Passkey{
+		BaseModel: repos.BaseModel{
+			ID:        id,
+			CreatedAt: time.Unix(passkey.CreatedAt, 0),
+		},
+		Name:       passkey.Name,
+		UserID:     userID,
+		Credential: credential,
 	}, nil
 }
 
@@ -239,6 +266,79 @@ func (u *userRepository) DeleteRecoveryCode(ctx context.Context, userID ulid.ULI
 func (u *userRepository) DeleteRecoveryCodes(ctx context.Context, userID ulid.ULID) error {
 	res, err := u.db.DeleteRecoveryCodes(ctx, userID.String())
 	return repoErrResult("delete recovery codes: %w", res, err)
+}
+
+func (u *userRepository) CreatePasskey(ctx context.Context, userID ulid.ULID, name string, credential webauthn.Credential) error {
+	cred, err := json.Marshal(credential)
+	if err != nil {
+		return fmt.Errorf("encode passkey credential: %w", err)
+	}
+	res, err := u.db.CreatePasskey(ctx, db.CreatePasskeyParams{
+		ID:         ulid.Make().String(),
+		CreatedAt:  time.Now().Unix(),
+		CredID:     credential.ID,
+		Name:       name,
+		UserID:     userID.String(),
+		Credential: cred,
+	})
+	return repoErrResult("create passkey: %w", res, err)
+}
+
+func (u *userRepository) GetPasskeys(ctx context.Context, userID ulid.ULID) ([]*repos.Passkey, error) {
+	passkeys, err := u.db.FindPasskeys(ctx, userID.String())
+	if err != nil {
+		return nil, repoErr("get passkeys: %w", err)
+	}
+	repoPasskeys := make([]*repos.Passkey, len(passkeys))
+	for i, p := range passkeys {
+		rp, err := repoPasskey(p)
+		if err != nil {
+			return nil, fmt.Errorf("get passkey: %w", err)
+		}
+		repoPasskeys[i] = rp
+	}
+	return repoPasskeys, nil
+}
+
+func (u *userRepository) GetPasskey(ctx context.Context, userID, id ulid.ULID) (*repos.Passkey, error) {
+	passkey, err := u.db.FindPasskey(ctx, db.FindPasskeyParams{
+		UserID: userID.String(),
+		ID:     id.String(),
+	})
+	if err != nil {
+		return nil, repoErr("get passkey: %w", err)
+	}
+	return repoPasskey(passkey)
+}
+
+func (u *userRepository) UpdatePasskeyCredential(ctx context.Context, userID ulid.ULID, credential webauthn.Credential) error {
+	cred, err := json.Marshal(credential)
+	if err != nil {
+		return fmt.Errorf("encode passkey credential: %w", err)
+	}
+	res, err := u.db.UpdatePasskeyCredential(ctx, db.UpdatePasskeyCredentialParams{
+		UserID:     userID.String(),
+		CredID:     credential.ID,
+		Credential: cred,
+	})
+	return repoErrResult("update passkey credential: %w", res, err)
+}
+
+func (u *userRepository) UpdatePasskey(ctx context.Context, userID, id ulid.ULID, name string) error {
+	res, err := u.db.UpdatePasskey(ctx, db.UpdatePasskeyParams{
+		Name:   name,
+		UserID: userID.String(),
+		ID:     id.String(),
+	})
+	return repoErrResult("update passkey: %w", res, err)
+}
+
+func (u *userRepository) DeletePasskey(ctx context.Context, userID, id ulid.ULID) error {
+	res, err := u.db.DeletePasskey(ctx, db.DeletePasskeyParams{
+		UserID: userID.String(),
+		ID:     id.String(),
+	})
+	return repoErrResult("delete passkey: %w", res, err)
 }
 
 func (u *userRepository) Delete(ctx context.Context, id ulid.ULID) error {

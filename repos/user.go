@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/oklog/ulid/v2"
 	"github.com/pquerna/otp"
 )
@@ -16,6 +17,13 @@ type UserModel struct {
 	OTPActive      bool
 	OTPKey         *otp.Key
 	PasswordHash   []byte
+}
+
+type Passkey struct {
+	BaseModel
+	Name       string
+	UserID     ulid.ULID
+	Credential webauthn.Credential
 }
 
 type UserRepository interface {
@@ -35,5 +43,11 @@ type UserRepository interface {
 	CountRecoveryCodes(ctx context.Context, userID ulid.ULID) (int, error)
 	DeleteRecoveryCode(ctx context.Context, userID ulid.ULID, codeHash []byte) error
 	DeleteRecoveryCodes(ctx context.Context, userID ulid.ULID) error
+	CreatePasskey(ctx context.Context, userID ulid.ULID, name string, credential webauthn.Credential) error
+	GetPasskeys(ctx context.Context, userID ulid.ULID) ([]*Passkey, error)
+	GetPasskey(ctx context.Context, userID, id ulid.ULID) (*Passkey, error)
+	UpdatePasskeyCredential(ctx context.Context, userID ulid.ULID, credential webauthn.Credential) error
+	UpdatePasskey(ctx context.Context, userID, id ulid.ULID, name string) error
+	DeletePasskey(ctx context.Context, userID, id ulid.ULID) error
 	Delete(ctx context.Context, id ulid.ULID) error
 }
