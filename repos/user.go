@@ -17,6 +17,7 @@ type UserModel struct {
 	OTPActive      bool
 	OTPKey         *otp.Key
 	PasswordHash   []byte
+	Admin          bool
 }
 
 type Passkey struct {
@@ -53,5 +54,6 @@ type UserRepository interface {
 	UpdatePasskeyCredential(ctx context.Context, userID ulid.ULID, credential webauthn.Credential) error
 	UpdatePasskey(ctx context.Context, userID, id ulid.ULID, name string) error
 	DeletePasskey(ctx context.Context, userID, id ulid.ULID) error
+	UpdateAdminStatus(ctx context.Context, userID ulid.ULID, isAdmin bool) error
 	Delete(ctx context.Context, id ulid.ULID) error
 }

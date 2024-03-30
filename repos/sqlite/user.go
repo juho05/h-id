@@ -52,6 +52,7 @@ func repoUser(user db.User) (*repos.UserModel, error) {
 		PasswordHash:   user.PasswordHash,
 		OTPActive:      user.OtpActive,
 		OTPKey:         otpKey,
+		Admin:          user.Admin,
 	}, nil
 }
 
@@ -377,6 +378,14 @@ func (u *userRepository) DeletePasskey(ctx context.Context, userID, id ulid.ULID
 		ID:     id.String(),
 	})
 	return repoErrResult("delete passkey: %w", res, err)
+}
+
+func (u *userRepository) UpdateAdminStatus(ctx context.Context, userID ulid.ULID, isAdmin bool) error {
+	res, err := u.db.UpdateAdminStatus(ctx, db.UpdateAdminStatusParams{
+		ID:    userID.String(),
+		Admin: isAdmin,
+	})
+	return repoErrResult("update admin status: %w", res, err)
 }
 
 func (u *userRepository) Delete(ctx context.Context, id ulid.ULID) error {

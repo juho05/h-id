@@ -28,6 +28,8 @@ UPDATE users SET otp_active = ? WHERE id = ?;
 UPDATE users SET new_email = ?, new_email_token = ?, new_email_expires = ? WHERE id = ?;
 -- name: UpdateEmail :one
 UPDATE users SET email = new_email, new_email = NULL, new_email_token = NULL, new_email_expires = NULL WHERE new_email_token = ? AND new_email_expires > sqlc.arg(now) RETURNING email;
+-- name: UpdateAdminStatus :execresult
+UPDATE users SET admin = ? WHERE id = ?;
 -- name: CreateRecoveryCode :exec
 INSERT INTO recovery_codes (created_at,user_id,code_hash) VALUES (?,?,?);
 -- name: CountRecoveryCodes :one

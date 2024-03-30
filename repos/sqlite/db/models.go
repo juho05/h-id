@@ -94,4 +94,5 @@ type User struct {
 	NewEmail        sql.NullString
 	NewEmailToken   []byte
 	NewEmailExpires sql.NullInt64
+	Admin           bool
 }

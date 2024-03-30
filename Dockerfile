@@ -14,12 +14,14 @@ RUN go mod download && go mod verify
 
 COPY . .
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o bin/h-id ./cmd/web
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o bin/h-id-cli ./cmd/cli
 
 # Run
 FROM alpine AS h-id
 ARG BUILDPLATFORM
 WORKDIR /
 COPY --from=build /app/bin/h-id /h-id
+COPY --from=build /app/bin/h-id-cli /h-id-cli
 
 ENV DB_CONNECTION=file:/data/database.sqlite?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(3000)
 ENV AUTO_MIGRATE=1
