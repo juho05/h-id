@@ -152,7 +152,7 @@ func (u *userService) RequestChangeEmail(ctx context.Context, lang string, user 
 	if err != nil {
 		return fmt.Errorf("request change email: %w", err)
 	}
-	data := newEmailTemplateData(user.Name, lang)
+	data := NewEmailTemplateData(user.Name, lang)
 	data.Code = token
 	go func() {
 		err := u.emailService.SendEmail(newEmail, MustTranslate(lang, "changeEmail"), "changeEmail", data)
@@ -179,7 +179,7 @@ func (u *userService) ChangeEmail(ctx context.Context, lang, token string) (stri
 		}
 		return "", err
 	}
-	data := newEmailTemplateData(user.Name, lang)
+	data := NewEmailTemplateData(user.Name, lang)
 	data.Email = email
 	go func() {
 		err := u.emailService.SendEmail(user.Email, MustTranslate(lang, "emailChanged"), "emailChanged", data)

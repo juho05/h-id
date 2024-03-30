@@ -399,7 +399,7 @@ func (a *authService) SendConfirmEmail(r *http.Request, ctx context.Context, use
 	}
 
 	lang := GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
-	data := newEmailTemplateData(user.Name, lang)
+	data := NewEmailTemplateData(user.Name, lang)
 	data.Code = generateCode(6)
 
 	_, err := a.tokenRepo.Create(ctx, repos.TokenConfirmEmail, user.ID.String(), hashToken(data.Code), 2*time.Minute)
@@ -467,7 +467,7 @@ func (a *authService) RequestForgotPassword(ctx context.Context, lang, email str
 		if err != nil {
 			return
 		}
-		data := newEmailTemplateData(user.Name, lang)
+		data := NewEmailTemplateData(user.Name, lang)
 		data.Code = token
 		err = a.emailService.SendEmail(user.Email, MustTranslate(lang, "forgotPassword"), "forgotPassword", data)
 		if err != nil {
@@ -531,7 +531,7 @@ func (a *authService) SendInvitation(ctx context.Context, email, lang string) er
 		return fmt.Errorf("send invitation: %w", err)
 	}
 
-	data := newEmailTemplateData("", lang)
+	data := NewEmailTemplateData("", lang)
 	data.Code = token
 	subject, err := Translate(lang, "invitation")
 	if err != nil {

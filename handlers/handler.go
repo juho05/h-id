@@ -18,6 +18,7 @@ type Handler struct {
 	UserService    services.UserService
 	ClientService  services.ClientService
 	SessionManager *scs.SessionManager
+	EmailService   services.EmailService
 	StaticFS       fs.FS
 }
 

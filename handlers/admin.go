@@ -87,6 +87,15 @@ func (h *Handler) adminDeleteUser(w http.ResponseWriter, r *http.Request) {
 		clientError(w, http.StatusBadRequest)
 		return
 	}
+	user, err := h.UserService.Find(r.Context(), userID)
+	if err != nil {
+		if errors.Is(err, repos.ErrNoRecord) {
+			clientError(w, http.StatusNotFound)
+		} else {
+			serverError(w, err)
+		}
+		return
+	}
 	err = h.UserService.Delete(r.Context(), userID)
 	if err != nil {
 		if errors.Is(err, repos.ErrNoRecord) {
@@ -96,6 +105,21 @@ func (h *Handler) adminDeleteUser(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+
+	lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
+	go func() {
+		subject, err := services.Translate(lang, "accountDeleted")
+		if err != nil {
+			log.Errorf("Failed to send account deleted notification: %w", err)
+			return
+		}
+		err = h.EmailService.SendEmail(user.Email, subject, "accountDeleted", services.NewEmailTemplateData(user.Name, lang))
+		if err != nil {
+			log.Errorf("Failed to send account deleted notification: %w", err)
+			return
+		}
+	}()
+
 	if userID == h.AuthService.AuthenticatedUserID(r.Context()) {
 		err := h.AuthService.Logout(r.Context())
 		if err != nil {

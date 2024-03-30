@@ -44,9 +44,11 @@ func run() error {
 	handler.SessionManager.Lifetime = 72 * time.Hour
 	handler.SessionManager.IdleTimeout = 12 * time.Hour
 	handler.SessionManager.Cookie.Secure = true
+	handler.SessionManager.Cookie.Name = "h-id_session"
 
 	emailService := services.NewEmailService(hid.EmailFS)
 
+	handler.EmailService = emailService
 	handler.AuthService, err = services.NewAuthService(userRepo, tokenRepo, oauthRepo, clientRepo, systemRepo, handler.SessionManager, emailService)
 	if err != nil {
 		return fmt.Errorf("new auth service: %w", err)

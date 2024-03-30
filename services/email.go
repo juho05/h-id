@@ -14,7 +14,7 @@ import (
 )
 
 type EmailService interface {
-	SendEmail(address, subject, messageName string, data emailTemplateData) error
+	SendEmail(address, subject, messageName string, data EmailTemplateData) error
 }
 
 type emailService struct {
@@ -22,7 +22,7 @@ type emailService struct {
 	templates map[string]*template.Template
 }
 
-type emailTemplateData struct {
+type EmailTemplateData struct {
 	Name    string
 	Code    string
 	BaseURL string
@@ -30,8 +30,8 @@ type emailTemplateData struct {
 	Email   string
 }
 
-func newEmailTemplateData(name, lang string) emailTemplateData {
-	return emailTemplateData{
+func NewEmailTemplateData(name, lang string) EmailTemplateData {
+	return EmailTemplateData{
 		Name:    name,
 		Lang:    lang,
 		BaseURL: config.BaseURL(),
@@ -78,7 +78,7 @@ func (e *emailService) loadTemplates(emailFS fs.FS) error {
 	return nil
 }
 
-func (e *emailService) SendEmail(address, subject, messageName string, data emailTemplateData) error {
+func (e *emailService) SendEmail(address, subject, messageName string, data EmailTemplateData) error {
 	if data.Email == "" {
 		data.Email = address
 	}
