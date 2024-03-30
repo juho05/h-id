@@ -15,7 +15,7 @@
       <nav>
         {{if not .UserID}}
         <a class="nav-link" href="/user/login">{{translate .Lang "login"}}</a>
-        <a class="nav-link" href="/user/signup">{{translate .Lang "signup"}}</a>
+        {{if not .InviteOnly}}<a class="nav-link" href="/user/signup">{{translate .Lang "signup"}}</a>{{end}}
         {{else}}
         <form action="/user/logout" method="post">
           <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">

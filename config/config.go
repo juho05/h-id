@@ -36,6 +36,18 @@ func Local() (b bool) {
 	return b
 }
 
+func InviteOnly() (b bool) {
+	if c, ok := values["INVITE_ONLY"]; ok {
+		return c.(bool)
+	}
+	defer func() {
+		values["INVITE_ONLY"] = b
+	}()
+	str := os.Getenv("INVITE_ONLY")
+	b, _ = strconv.ParseBool(str)
+	return b
+}
+
 func BehindProxy() (b bool) {
 	if c, ok := values["BEHIND_PROXY"]; ok {
 		return c.(bool)

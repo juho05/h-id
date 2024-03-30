@@ -54,6 +54,9 @@ type AuthService interface {
 	ResetPassword(ctx context.Context, token, newPassword string) error
 	UpdatePassword(ctx context.Context, userID ulid.ULID, password string) error
 
+	SendInvitation(ctx context.Context, email, lang string) error
+	VerifyInvitationToken(ctx context.Context, email, token string) error
+
 	GenerateOTPKey(ctx context.Context, user *repos.UserModel) (*otp.Key, error)
 	ActivateOTPKey(ctx context.Context, userID ulid.ULID, code string) error
 	VerifyOTPCode(ctx context.Context, userID ulid.ULID, code string) error
@@ -508,6 +511,56 @@ func (a *authService) UpdatePassword(ctx context.Context, userID ulid.ULID, pass
 	err = a.userRepo.DeleteRemember2FATokens(ctx, userID)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+func (a *authService) SendInvitation(ctx context.Context, email, lang string) error {
+	_, err := a.userRepo.FindByEmail(ctx, email)
+	if err == nil {
+		return repos.ErrExists
+	} else if !errors.Is(err, repos.ErrNoRecord) {
+		return fmt.Errorf("send invitation: %w", err)
+	}
+
+	token := generateToken(64)
+	tokenHash := hashToken(token)
+
+	_, err = a.tokenRepo.Create(ctx, repos.TokenInvitation, email, tokenHash, 3*24*time.Hour)
+	if err != nil {
+		return fmt.Errorf("send invitation: %w", err)
+	}
+
+	data := newEmailTemplateData("", lang)
+	data.Code = token
+	subject, err := Translate(lang, "invitation")
+	if err != nil {
+		return fmt.Errorf("send invitation: %w", err)
+	}
+	go func() {
+		err := a.emailService.SendEmail(email, subject, "invitation", data)
+		if err != nil {
+			log.Errorf("Failed to send email: %w", err)
+		}
+	}()
+	return nil
+}
+
+func (a *authService) VerifyInvitationToken(ctx context.Context, email, token string) error {
+	tokenHash := hashToken(token)
+	t, err := a.tokenRepo.FindByValue(ctx, repos.TokenInvitation, tokenHash)
+	if err != nil {
+		if errors.Is(err, repos.ErrNoRecord) {
+			return ErrInvalidCredentials
+		}
+		return fmt.Errorf("verify invitation token: %w", err)
+	}
+	if t.Key != email {
+		return ErrInvalidCredentials
+	}
+	err = a.tokenRepo.Delete(ctx, repos.TokenInvitation, t.Key)
+	if err != nil {
+		return fmt.Errorf("verify invitation token: delete used token: %w", err)
 	}
 	return nil
 }

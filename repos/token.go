@@ -10,6 +10,7 @@ type TokenCategory string
 var (
 	TokenConfirmEmail   TokenCategory = "confirm-email"
 	TokenForgotPassword TokenCategory = "forgot-password"
+	TokenInvitation     TokenCategory = "invitation"
 )
 
 type TokenModel struct {

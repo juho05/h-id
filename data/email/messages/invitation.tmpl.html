@@ -1,0 +1,7 @@
+{{define "title"}}{{translate .Lang "invitation"}}{{end}}
+
+{{define "smallPrint"}}{{end}}
+
+{{define "content"}}
+{{translate .Lang "youHaveBeenInvitedToHID"}}: <a href="{{.BaseURL}}/user/signup?email={{.Email}}&invitation={{.Code}}">{{translate .Lang "createAccountFromInvitation"}}</a><br>
+{{end}}

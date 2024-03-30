@@ -13,7 +13,6 @@
   <form id="appForm" class="form" action="/user/passkey/{{.Data.ID}}/update" method="POST">
     <div>
       <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
-      <input type="hidden" name="encodedName" value="{{.Form.EncodedName}}">
 
       <label class="input-label" for="name">{{translate .Lang "name"}}:</label>
       <input class="{{if .FieldErrors.Name}}invalid-field{{end}}" id="name" type="text" name="name" {{with .Form}}value="{{.Name}}"{{end}} required>
@@ -22,7 +21,7 @@
       <label class="input-label" for="createdAt">{{translate .Lang "createdAt"}}:</label>
       <input id="createdAt" type="text" name="createdAt" value="{{.Data.CreatedAt}}" disabled>
 
-      <a id="deleteAppBtn" href="/confirm?type=delete&name={{.Form.EncodedName}}&url=/user/passkey/{{.Data.ID}}/delete">{{translate .Lang "delete"}}</a>
+      <a id="deleteAppBtn" href="/confirm?type=delete&name={{.Form.Name}}&url=/user/passkey/{{.Data.ID}}/delete">{{translate .Lang "delete"}}</a>
     </div>
     <div class="submit-div">
       <input class="btn" type="submit" value="{{translate .Lang "update"}}">

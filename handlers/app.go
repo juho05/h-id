@@ -126,14 +126,12 @@ func (h *Handler) appGet(w http.ResponseWriter, r *http.Request) {
 		Description  string
 		Website      string
 		RedirectURIs []string
-		EncodedName  string
 	}
 	tmplData.Form = form{
 		Name:         client.Name,
 		Description:  client.Description,
 		Website:      client.Website.String(),
 		RedirectURIs: urlsToStrings(client.RedirectURIs),
-		EncodedName:  url.QueryEscape(client.Name),
 	}
 	h.Renderer.render(w, r, http.StatusOK, "app", tmplData)
 }
@@ -151,7 +149,6 @@ func (h *Handler) appUpdate(w http.ResponseWriter, r *http.Request) {
 		Description  string   `form:"description" validate:"max=512"`
 		Website      string   `form:"website" validate:"required,http_url"`
 		RedirectURIs []string `form:"redirectURIs" validate:"required,min=1,dive,required,http_url"`
-		EncodedName  string   `form:"encodedName" validate:"required"`
 	}
 
 	tmplData := h.newTemplateDataWithData(r, struct{ ID string }{ID: id.String()})

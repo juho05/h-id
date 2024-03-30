@@ -28,7 +28,7 @@
                 <td style="background-color: white;min-height: 200px;">
                   <div style="height: 200px; padding: 5px 10px;">
                     <p style="color: black;font-size: 14px;">
-                      {{translate .Lang "dear"}} {{.Name}},<br><br>
+                      {{if .Name}}{{translate .Lang "dear"}} {{.Name}}{{else}}{{translate .Lang "hello"}}{{end}},<br><br>
                       {{template "content" .}}<br><br>
                       ~ H-ID
                     </p>

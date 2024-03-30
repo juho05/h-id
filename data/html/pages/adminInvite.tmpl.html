@@ -1,0 +1,31 @@
+{{define "title"}}{{translate .Lang "invite"}}{{end}}
+
+{{define "main"}}
+<div class="form-panel">
+  <h2 class="form-title">{{translate .Lang "invite"}}</h2>
+  {{with .Errors}}
+  <ul class="error-list">
+    {{range .}}
+    <li>{{.}}</li>
+    {{end}}
+  </ul>
+  {{end}}
+  {{if .Data}}
+    {{if .Data.Success}}
+    <label class="hint-label hint-label-success">{{translate .Lang "invitationSuccess"}}</label>
+    {{end}}
+  {{end}}
+  <form class="form" action="/admin/user/invite" method="POST">
+    <div>
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+      <label class="input-label" for="email">{{translate .Lang "email"}}:</label>
+      <input class="{{if .FieldErrors.Email}}invalid-field{{end}}" id="email" type="email" name="email" {{with .Form}}{{if .Email}}value="{{.Email}}"{{else}}autofocus{{end}}{{else}}autofocus{{end}} required>
+      {{with .FieldErrors.Email}}<label class="error-label" for="email">{{.}}</label>{{end}}
+    </div>
+    <div class="submit-div">
+      <input class="btn" type="submit" value="{{translate .Lang "invite"}}">
+    </div>
+  </form>
+</div>
+{{end}}

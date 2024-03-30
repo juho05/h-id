@@ -14,6 +14,7 @@
   <form class="form" action="/user/signup" method="POST">
     <div>
       <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <input type="hidden" name="invite" value="{{.Form.InviteToken}}">
 
       <label class="input-label" for="name">{{translate .Lang "name"}}:</label>
       <input class="{{if .FieldErrors.Name}}invalid-field{{end}}" id="name" type="text" name="name" maxlength="32" {{with .Form}}value="{{.Name}}"{{else}}autofocus{{end}} required >

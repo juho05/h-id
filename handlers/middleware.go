@@ -181,6 +181,26 @@ func (h *Handler) oauth(requiredScopes ...string) func(next http.Handler) http.H
 	}
 }
 
+func (h *Handler) admin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID := h.AuthService.AuthenticatedUserID(r.Context())
+		if userID == (ulid.ULID{}) {
+			serverError(w, errors.New("admin middleware required auth middleware"))
+			return
+		}
+		user, err := h.UserService.Find(r.Context(), userID)
+		if err != nil {
+			serverError(w, fmt.Errorf("admin middleware: %w", err))
+			return
+		}
+		if !user.Admin {
+			clientError(w, http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func staticCache(maxAge time.Duration) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

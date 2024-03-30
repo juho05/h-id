@@ -32,6 +32,7 @@ func (h *Handler) RegisterRoutes() {
 		http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
 	})
 	h.Router.With(h.SessionManager.LoadAndSave, csrf).Route("/user", h.userRoutes)
+	h.Router.With(h.SessionManager.LoadAndSave, csrf, h.auth, h.admin).Route("/admin", h.adminRoutes)
 	h.Router.With(corsHeaders, h.SessionManager.LoadAndSave).Route("/oauth", h.oauthRoutes)
 	h.Router.With(h.SessionManager.LoadAndSave, csrf, h.auth).Route("/app", h.appRoutes)
 	h.Router.With(h.SessionManager.LoadAndSave, csrf, h.auth).Get("/confirm", h.confirm)

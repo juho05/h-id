@@ -20,6 +20,7 @@ type templateData struct {
 	Form        any
 	Data        any
 	Lang        string
+	InviteOnly  bool
 	FieldErrors map[string]string
 	Errors      []string
 	CSRFToken   string
@@ -38,6 +39,7 @@ func (h *Handler) newTemplateData(r *http.Request) templateData {
 		CSRFToken:   nosurf.Token(r),
 		SiteKey:     config.HCaptchaSiteKey(),
 		UserID:      userIDStr,
+		InviteOnly:  config.InviteOnly(),
 	}
 }
 

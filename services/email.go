@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/juho05/h-id/config"
+	"github.com/juho05/log"
 )
 
 type EmailService interface {
@@ -22,11 +23,11 @@ type emailService struct {
 }
 
 type emailTemplateData struct {
-	Name     string
-	Code     string
-	BaseURL  string
-	Lang     string
-	NewEmail string
+	Name    string
+	Code    string
+	BaseURL string
+	Lang    string
+	Email   string
 }
 
 func newEmailTemplateData(name, lang string) emailTemplateData {
@@ -43,7 +44,10 @@ func NewEmailService(emailFS fs.FS) EmailService {
 		auth:      emailAuth,
 		templates: make(map[string]*template.Template),
 	}
-	e.loadTemplates(emailFS)
+	err := e.loadTemplates(emailFS)
+	if err != nil {
+		log.Errorf("Failed to load email templates: %s", err)
+	}
 	return e
 }
 
@@ -75,6 +79,9 @@ func (e *emailService) loadTemplates(emailFS fs.FS) error {
 }
 
 func (e *emailService) SendEmail(address, subject, messageName string, data emailTemplateData) error {
+	if data.Email == "" {
+		data.Email = address
+	}
 	mime := "MIME-version: 1.0;\nContent-Type: text/html; charset=\"UTF-8\";\n\n"
 
 	subject = "Subject: " + subject + "\n"

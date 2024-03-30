@@ -79,17 +79,29 @@ func (h *Handler) userRoutes(r chi.Router) {
 }
 
 func (h *Handler) userSignUpPage(w http.ResponseWriter, r *http.Request) {
-	type tmplData struct {
+	type data struct {
 		LoginRedirect string
 	}
-	data := tmplData{}
+	tmplData := h.newTemplateData(r)
 	if redirect := h.SessionManager.GetString(r.Context(), "loginRedirect"); redirect != "" {
-		data.LoginRedirect = url.QueryEscape(redirect)
+		tmplData.Data = data{
+			LoginRedirect: url.QueryEscape(redirect),
+		}
 	}
 	if config.HCaptchaSiteKey() != "" {
 		w.Header().Set("Cross-Origin-Embedder-Policy", "unsafe-none")
 	}
-	h.Renderer.render(w, r, http.StatusOK, "signup", h.newTemplateDataWithData(r, data))
+	query := r.URL.Query()
+	type form struct {
+		Name        string
+		Email       string
+		InviteToken string
+	}
+	tmplData.Form = form{
+		Email:       query.Get("email"),
+		InviteToken: query.Get("invitation"),
+	}
+	h.Renderer.render(w, r, http.StatusOK, "signup", tmplData)
 }
 
 // POST /user/signup
@@ -99,6 +111,7 @@ func (h *Handler) userSignUp(w http.ResponseWriter, r *http.Request) {
 		Email          string `form:"email" validate:"required,email"`
 		Password       string `form:"password" validate:"required,min=6,maxsize=72"`
 		RepeatPassword string `form:"repeatPassword" validate:"required,eqfield=Password"`
+		InviteToken    string `form:"invite"`
 	}
 	type tmplData struct {
 		LoginRedirect string
@@ -112,6 +125,23 @@ func (h *Handler) userSignUp(w http.ResponseWriter, r *http.Request) {
 	}
 	body.Name = strings.TrimSpace(body.Name)
 	body.Email = strings.TrimSpace(body.Email)
+
+	lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
+	if body.InviteToken != "" || config.InviteOnly() {
+		err := h.AuthService.VerifyInvitationToken(r.Context(), body.Email, body.InviteToken)
+		if err != nil {
+			if !errors.Is(err, services.ErrInvalidCredentials) {
+				serverError(w, err)
+				return
+			}
+			if config.InviteOnly() {
+				data.Form = body
+				data.Errors = append(data.Errors, services.MustTranslate(lang, "inviteOnlyInvalidToken"))
+				h.Renderer.render(w, r, http.StatusUnprocessableEntity, "signup", data)
+				return
+			}
+		}
+	}
 
 	user, err := h.UserService.Create(r.Context(), body.Name, body.Email, body.Password)
 	if err != nil {
@@ -430,16 +460,14 @@ func (h *Handler) getPasskey(w http.ResponseWriter, r *http.Request) {
 		CreatedAt string
 	}
 	type form struct {
-		Name        string
-		EncodedName string
+		Name string
 	}
 	tmplData := h.newTemplateDataWithData(r, data{
 		ID:        passkey.ID.String(),
 		CreatedAt: passkey.CreatedAt.Format(time.DateTime + " MST"),
 	})
 	tmplData.Form = form{
-		Name:        passkey.Name,
-		EncodedName: url.QueryEscape(passkey.Name),
+		Name: passkey.Name,
 	}
 	h.Renderer.render(w, r, http.StatusOK, "passkey", tmplData)
 }

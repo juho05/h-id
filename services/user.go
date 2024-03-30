@@ -175,7 +175,7 @@ func (u *userService) ChangeEmail(ctx context.Context, lang, token string) (stri
 		return "", err
 	}
 	data := newEmailTemplateData(user.Name, lang)
-	data.NewEmail = email
+	data.Email = email
 	go func() {
 		err := u.emailService.SendEmail(user.Email, MustTranslate(lang, "emailChanged"), "emailChanged", data)
 		if err != nil {
