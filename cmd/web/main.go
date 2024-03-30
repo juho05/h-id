@@ -27,7 +27,7 @@ import (
 func run() error {
 	handler := handlers.NewHandler()
 
-	db, err := sqlite.Connect(config.DBConnection())
+	db, err := sqlite.Connect(config.DBFile())
 	if err != nil {
 		return fmt.Errorf("Failed to connect to database: %w", err)
 	}

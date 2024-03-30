@@ -38,23 +38,11 @@ func autoMigrate(db *sql.DB) error {
 	return nil
 }
 
-func Connect(connectionString string) (repos.DB, error) {
-	rawDB, err := sql.Open("sqlite", connectionString)
+func Connect(filePath string) (repos.DB, error) {
+	connectionURL := fmt.Sprintf("file:%s?_txlock=immediate&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)&_pragma=cache_size(-50000)&_pragma=temp_store(memory)", filePath)
+	rawDB, err := sql.Open("sqlite", connectionURL)
 	if err != nil {
 		return nil, err
-	}
-
-	_, err = rawDB.Exec("PRAGMA journal_mode = WAL")
-	if err != nil {
-		return nil, fmt.Errorf("enable WAL: %w", err)
-	}
-	_, err = rawDB.Exec("PRAGMA foreign_keys = 1")
-	if err != nil {
-		return nil, fmt.Errorf("enable foreign keys: %w", err)
-	}
-	_, err = rawDB.Exec("PRAGMA busy_timeout = 3000")
-	if err != nil {
-		return nil, fmt.Errorf("enable foreign keys: %w", err)
 	}
 
 	if config.AutoMigrate() {

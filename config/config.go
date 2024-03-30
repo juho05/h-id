@@ -153,20 +153,20 @@ func BcryptCost() (cost int) {
 	return cost
 }
 
-func DBConnection() (con string) {
-	if c, ok := values["DB_CONNECTION"]; ok {
+func DBFile() (f string) {
+	if c, ok := values["DB_FILE"]; ok {
 		return c.(string)
 	}
 	defer func() {
-		values["DB_CONNECTION"] = con
+		values["DB_FILE"] = f
 	}()
-	def := "file:database.sqlite?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(3000)"
-	con = os.Getenv("DB_CONNECTION")
-	if con == "" {
+	def := "database.sqlite"
+	f = os.Getenv("DB_FILE")
+	if f == "" {
 		return def
 	}
-	os.MkdirAll(filepath.Dir(con), 0o755)
-	return con
+	os.MkdirAll(filepath.Dir(f), 0o755)
+	return f
 }
 
 func TLSCert() (path string) {

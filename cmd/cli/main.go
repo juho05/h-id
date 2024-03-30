@@ -55,7 +55,7 @@ func invite(authService services.AuthService, args []string) error {
 }
 
 func run(args []string) error {
-	db, err := sqlite.Connect(config.DBConnection())
+	db, err := sqlite.Connect(config.DBFile())
 	if err != nil {
 		return fmt.Errorf("connect to database: %w", err)
 	}
