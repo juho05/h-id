@@ -180,6 +180,58 @@ func decodeAndValidateBodyWithCaptcha[T any](handler *Handler, w http.ResponseWr
 	return data, true
 }
 
+func (h *Handler) verifyConfirmation(w http.ResponseWriter, r *http.Request, name string, requirePassword bool) bool {
+	type request struct {
+		ConfirmationToken string `form:"confirmationToken"`
+		RedirectURL       string `form:"redirectURL" validate:"required"`
+		Name              string `form:"name" validate:"required"`
+		Password          string `form:"password"`
+	}
+	type data struct {
+		RequirePassword bool
+	}
+	tmplData := h.newTemplateDataWithData(r, data{
+		RequirePassword: requirePassword,
+	})
+	body, ok := decodeAndValidateBody[request](h, w, r, "confirmDelete", &tmplData)
+	if !ok {
+		return false
+	}
+	tmplData.Form = body
+	if body.RedirectURL != r.URL.Path {
+		h.Renderer.render(w, r, http.StatusUnprocessableEntity, "confirmDelete", tmplData)
+		return false
+	}
+	lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
+
+	if h.SessionManager.GetString(r.Context(), "confirm:"+body.ConfirmationToken) != r.URL.Path {
+		h.Renderer.render(w, r, http.StatusUnprocessableEntity, "confirmDelete", tmplData)
+		return false
+	}
+
+	if body.Name != name {
+		body.Name = name
+		tmplData.Form = body
+		tmplData.FieldErrors["Name"] = services.MustTranslate(lang, "confirmNameWrong")
+		h.Renderer.render(w, r, http.StatusUnprocessableEntity, "confirmDelete", tmplData)
+		return false
+	}
+
+	if requirePassword {
+		if err := h.AuthService.VerifyPasswordByID(r.Context(), h.AuthService.AuthenticatedUserID(r.Context()), body.Password); err != nil {
+			if !errors.Is(err, services.ErrInvalidCredentials) {
+				serverError(w, err)
+			} else {
+				tmplData.FieldErrors["Password"] = services.MustTranslate(lang, "wrongPassword")
+				h.Renderer.render(w, r, http.StatusUnauthorized, "confirmDelete", tmplData)
+			}
+			return false
+		}
+	}
+	h.SessionManager.Remove(r.Context(), "confirm:"+body.ConfirmationToken)
+	return true
+}
+
 func decodeBody[T any](r *http.Request) (T, error) {
 	if r.Body != nil {
 		defer r.Body.Close()

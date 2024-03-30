@@ -112,6 +112,8 @@ var translations = map[string]map[string]string{
 		"accountDeleted":                  "Account Deleted",
 		"accountWithEmailDeletedByAdmin1": "Your account with the email address",
 		"accountWithEmailDeletedByAdmin2": "has been deleted by an administrator",
+		"confirmName":                     "Confirm name",
+		"confirmNameWrong":                "Please type the name of the item you want to delete.",
 	},
 	"de": {
 		"submit":                          "Submit",
@@ -218,6 +220,8 @@ var translations = map[string]map[string]string{
 		"accountDeleted":                  "Account Gelöscht",
 		"accountWithEmailDeletedByAdmin1": "Dein Account mit der Email-Adresse",
 		"accountWithEmailDeletedByAdmin2": "wurde von einem Administrator gelöscht",
+		"confirmName":                     "Name bestätigen",
+		"confirmNameWrong":                "Bitte schreibe den Namen des Objektes, das du löschen möchtest.",
 	},
 }
 

@@ -14,7 +14,7 @@
       <label class="input-label">{{translate .Lang "isAdmin"}}: {{.Data.IsAdmin}}</label>
     </div>
     <div class="submit-div">
-      <a class="btn btn-red" href="/confirm?type=delete&name={{.Data.Name}}&url=/admin/user/{{.Data.ID}}/delete">{{translate .Lang "delete"}}</a>
+      <a class="btn btn-red" href="/confirm?type=delete&requirePassword=true&name={{.Data.Name}}&url=/admin/user/{{.Data.ID}}/delete">{{translate .Lang "delete"}}</a>
     </div>
   </div>
 </div>

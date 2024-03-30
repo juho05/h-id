@@ -43,7 +43,7 @@ func (c *clientService) FindByUser(ctx context.Context, userID ulid.ULID) ([]*re
 }
 
 func (c *clientService) Create(ctx context.Context, userID ulid.ULID, name, description string, website *url.URL, redirectURIs []*url.URL) (*repos.ClientModel, string, error) {
-	secret := generateToken(64)
+	secret := GenerateToken(64)
 	secretHash := hashToken(secret)
 	client, err := c.clientRepo.Create(ctx, userID, name, description, website, redirectURIs, secretHash)
 	if err != nil {
@@ -58,7 +58,7 @@ func (c *clientService) Update(ctx context.Context, userID, clientID ulid.ULID, 
 }
 
 func (c *clientService) ClientRotateSecret(ctx context.Context, userID, clientID ulid.ULID) (string, error) {
-	secret := generateToken(64)
+	secret := GenerateToken(64)
 	secretHash := hashToken(secret)
 	err := c.clientRepo.UpdateSecret(ctx, userID, clientID, secretHash)
 	if err != nil {

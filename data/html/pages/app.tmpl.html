@@ -32,7 +32,7 @@
       <label class="input-label" for="redirectURI">{{translate .Lang "redirectURI"}}:</label>
       <input class="{{if .FieldErrors.RedirectURIs0}}invalid-field{{end}}" id="redirectURI" type="url" name="redirectURIs" {{with .Form}}{{with .RedirectURIs}}value="{{index . 0}}"{{end}}{{end}} required>
       {{with .FieldErrors.RedirectURIs0}}<label class="error-label" for="redirectURI">{{.}}</label>{{end}}
-      <a id="deleteAppBtn" href="/confirm?type=delete&name={{.Form.Name}}&url=/app/{{.Data.ID}}/delete">{{translate .Lang "delete"}}</a>
+      <a id="deleteAppBtn" href="/confirm?type=delete&requirePassword=true&name={{.Form.Name}}&url=/app/{{.Data.ID}}/delete">{{translate .Lang "delete"}}</a>
     </div>
     <div class="submit-div">
       <input class="btn" type="submit" value="{{translate .Lang "update"}}">

@@ -146,7 +146,7 @@ func (u *userService) RequestChangeEmail(ctx context.Context, lang string, user 
 	if !errors.Is(err, repos.ErrNoRecord) {
 		return fmt.Errorf("request change email: %w", err)
 	}
-	token := generateToken(64)
+	token := GenerateToken(64)
 	tokenHash := hashTokenWeak(token)
 	err = u.userRepo.CreateChangeEmailRequest(ctx, user.ID, newEmail, tokenHash, 3*time.Hour)
 	if err != nil {

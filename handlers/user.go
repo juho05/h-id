@@ -524,6 +524,19 @@ func (h *Handler) deletePasskey(w http.ResponseWriter, r *http.Request) {
 		clientError(w, http.StatusBadRequest)
 		return
 	}
+	passkey, err := h.UserService.GetPasskey(r.Context(), h.AuthService.AuthenticatedUserID(r.Context()), passkeyID)
+	if err != nil {
+		if errors.Is(err, repos.ErrNoRecord) {
+			clientError(w, http.StatusNotFound)
+		} else {
+			serverError(w, err)
+		}
+		return
+	}
+	ok := h.verifyConfirmation(w, r, passkey.Name, false)
+	if !ok {
+		return
+	}
 	err = h.UserService.DeletePasskey(r.Context(), h.AuthService.AuthenticatedUserID(r.Context()), passkeyID)
 	if err != nil {
 		if errors.Is(err, repos.ErrNoRecord) {

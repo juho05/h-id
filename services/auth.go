@@ -259,7 +259,7 @@ func (a *authService) OAuthConsent(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("OAuth consent: %w", err)
 	}
-	code := generateToken(64)
+	code := GenerateToken(64)
 	codeHash := hashTokenWeak(code)
 
 	userID := a.AuthenticatedUserID(ctx)
@@ -320,9 +320,9 @@ func (a *authService) OAuthGenerateTokens(ctx context.Context, clientID ulid.ULI
 		return "", "", "", fmt.Errorf("oauth generate tokens: %w", err)
 	}
 
-	access := generateToken(64)
+	access := GenerateToken(64)
 	accessHash := hashTokenWeak(access)
-	refresh := generateToken(128)
+	refresh := GenerateToken(128)
 	refreshHash := hashTokenWeak(refresh)
 
 	_, err = a.oauthRepo.Create(ctx, token.ClientID, token.UserID, repos.OAuthTokenAccess, accessHash, nil, token.Scopes, nil, 30*time.Minute)
@@ -454,7 +454,7 @@ func (a *authService) RequestForgotPassword(ctx context.Context, lang, email str
 	} else if err != nil && !errors.Is(err, repos.ErrNoRecord) {
 		return fmt.Errorf("check forgot password timeout: %w", err)
 	}
-	token := generateToken(64)
+	token := GenerateToken(64)
 	tokenHash := hashToken(token)
 
 	_, err := a.tokenRepo.Create(ctx, repos.TokenForgotPassword, email, tokenHash, 2*time.Minute)
@@ -523,7 +523,7 @@ func (a *authService) SendInvitation(ctx context.Context, email, lang string) er
 		return fmt.Errorf("send invitation: %w", err)
 	}
 
-	token := generateToken(64)
+	token := GenerateToken(64)
 	tokenHash := hashToken(token)
 
 	_, err = a.tokenRepo.Create(ctx, repos.TokenInvitation, email, tokenHash, 3*24*time.Hour)
@@ -691,7 +691,7 @@ func (a *authService) GenerateRecoveryCodes(ctx context.Context, userID ulid.ULI
 	codes := make([]string, 10)
 	codeHashes := make([][]byte, 10)
 	for i := 0; i < 10; i++ {
-		codes[i] = generateToken(32)
+		codes[i] = GenerateToken(32)
 		codeHashes[i] = hashToken(codes[i])
 	}
 	err := a.userRepo.CreateRecoveryCodes(ctx, userID, codeHashes)
@@ -716,7 +716,7 @@ func (a *authService) DeleteRecoveryCodes(ctx context.Context, userID ulid.ULID,
 }
 
 func (a *authService) CreateRemember2FACookie(ctx context.Context, userID ulid.ULID) (*http.Cookie, error) {
-	code := generateToken(64)
+	code := GenerateToken(64)
 	codeHash := hashToken(code)
 	lifetime := 6 * 30 * 24 * time.Hour
 	err := a.userRepo.CreateRemember2FAToken(ctx, userID, codeHash, lifetime)
@@ -917,7 +917,7 @@ func generateCode(length int) string {
 	return fmt.Sprintf("%v", c)
 }
 
-func generateToken(length int) string {
+func GenerateToken(length int) string {
 	const letters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 	ret := make([]byte, length)
 	for i := 0; i < length; i++ {

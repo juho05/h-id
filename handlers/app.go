@@ -186,6 +186,22 @@ func (h *Handler) appDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	userID := h.AuthService.AuthenticatedUserID(r.Context())
+
+	app, err := h.ClientService.Find(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, repos.ErrNoRecord) {
+			clientError(w, http.StatusNotFound)
+		} else {
+			serverError(w, err)
+		}
+		return
+	}
+
+	ok := h.verifyConfirmation(w, r, app.Name, true)
+	if !ok {
+		return
+	}
+
 	err = h.ClientService.Delete(r.Context(), userID, id)
 	if err != nil {
 		if errors.Is(err, repos.ErrNoRecord) {

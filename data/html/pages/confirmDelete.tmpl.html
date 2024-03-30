@@ -3,9 +3,23 @@
 {{define "main"}}
 <div class="form-panel">
   <h2 class="form-title">{{translate .Lang "areYouSure"}}</h2>
-  <form id="confirmForm" class="form" action="{{.Data.RedirectURL}}" method="POST">
+  <form id="confirmForm" class="form" action="{{.Form.RedirectURL}}" method="POST">
+    <div>
     <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
-    <p class="hint-label-error" id="confirmText">{{translate .Lang "areYouSureYouWantToDelete1"}} {{.Data.Name}}{{translate .Lang "areYouSureYouWantToDelete2"}}</p>
+    <input type="hidden" name="confirmationToken" value="{{.Form.ConfirmationToken}}">
+    <input type="hidden" name="redirectURL" value="{{.Form.RedirectURL}}">
+    <p class="hint-label-error" id="confirmText">{{translate .Lang "areYouSureYouWantToDelete1"}} {{.Form.Name}}{{translate .Lang "areYouSureYouWantToDelete2"}}</p>
+
+    <label class="input-label" for="name">{{translate .Lang "confirmName"}}:</label>
+    <input type="text" name="name" id="name" placeholder="{{.Form.Name}}" required>
+    {{with .FieldErrors.Name}}<label class="error-label" for="name">{{.}}</label>{{end}}
+
+    {{if .Data.RequirePassword}}
+    <label class="input-label" for="password">{{translate .Lang "password"}}:</label>
+    <input class="{{if .FieldErrors.Password}}invalid-field{{end}}" id="password" type="password" name="password" required>
+    {{with .FieldErrors.Password}}<label class="error-label" for="password">{{.}}</label>{{end}}
+    {{end}}
+    </div>
     <input type="submit" class="btn btn-red" value="{{translate .Lang "delete"}}"/>
   </form>
   <a class="clickable" id="cancel-btn">{{translate .Lang "cancel"}}</a>

@@ -96,6 +96,12 @@ func (h *Handler) adminDeleteUser(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+
+	ok := h.verifyConfirmation(w, r, user.Name, true)
+	if !ok {
+		return
+	}
+
 	err = h.UserService.Delete(r.Context(), userID)
 	if err != nil {
 		if errors.Is(err, repos.ErrNoRecord) {
