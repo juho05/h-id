@@ -1,3 +1,5 @@
+-- name: FindUsers :many
+SELECT * FROM users;
 -- name: FindUser :one
 SELECT * FROM users WHERE id = ?;
 -- name: FindUserByEmail :one

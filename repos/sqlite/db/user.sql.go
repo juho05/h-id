@@ -210,6 +210,46 @@ func (q *Queries) FindUserByEmail(ctx context.Context, email string) (User, erro
 	return i, err
 }
 
+const findUsers = `-- name: FindUsers :many
+SELECT id, created_at, name, email, email_confirmed, password_hash, otp_active, otp_url, new_email, new_email_token, new_email_expires, admin FROM users
+`
+
+func (q *Queries) FindUsers(ctx context.Context) ([]User, error) {
+	rows, err := q.db.QueryContext(ctx, findUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.Name,
+			&i.Email,
+			&i.EmailConfirmed,
+			&i.PasswordHash,
+			&i.OtpActive,
+			&i.OtpUrl,
+			&i.NewEmail,
+			&i.NewEmailToken,
+			&i.NewEmailExpires,
+			&i.Admin,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getOTP = `-- name: GetOTP :one
 SELECT otp_active,otp_url FROM users WHERE id = ?
 `

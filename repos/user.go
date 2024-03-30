@@ -29,6 +29,7 @@ type Passkey struct {
 
 type UserRepository interface {
 	Find(ctx context.Context, id ulid.ULID) (*UserModel, error)
+	FindAll(ctx context.Context) ([]*UserModel, error)
 	FindByEmail(ctx context.Context, email string) (*UserModel, error)
 	FindByChangeEmailToken(ctx context.Context, tokenHash []byte) (*UserModel, error)
 	GetPasswordHash(ctx context.Context, userID ulid.ULID) ([]byte, error)

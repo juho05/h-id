@@ -107,6 +107,8 @@ var translations = map[string]map[string]string{
 		"createAccountFromInvitation": "create account",
 		"inviteOnlyInvalidToken":      "You need a valid invitation to create an account.",
 		"invitationSuccess":           "Invitation sent.",
+		"listUsers":                   "Users",
+		"isAdmin":                     "Admin",
 	},
 	"de": {
 		"submit":                      "Submit",
@@ -208,6 +210,8 @@ var translations = map[string]map[string]string{
 		"createAccountFromInvitation": "Account erstellen",
 		"inviteOnlyInvalidToken":      "Du brauchst eine valide Einladung, um einen Account zu erstellen.",
 		"invitationSuccess":           "Einladung gesendet.",
+		"listUsers":                   "Nutzer",
+		"isAdmin":                     "Admin",
 	},
 }
 

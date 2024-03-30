@@ -28,6 +28,18 @@ func (db *DB) NewUserRepository() repos.UserRepository {
 	}
 }
 
+func repoUsers(users []db.User) ([]*repos.UserModel, error) {
+	repoUsers := make([]*repos.UserModel, len(users))
+	for i, u := range users {
+		user, err := repoUser(u)
+		if err != nil {
+			return nil, err
+		}
+		repoUsers[i] = user
+	}
+	return repoUsers, nil
+}
+
 func repoUser(user db.User) (*repos.UserModel, error) {
 	id, err := ulid.Parse(user.ID)
 	if err != nil {
@@ -87,6 +99,14 @@ func (u *userRepository) Find(ctx context.Context, id ulid.ULID) (*repos.UserMod
 		return nil, repoErr("find user: %w", err)
 	}
 	return repoUser(user)
+}
+
+func (u *userRepository) FindAll(ctx context.Context) ([]*repos.UserModel, error) {
+	users, err := u.db.FindUsers(ctx)
+	if err != nil {
+		return nil, repoErr("find all users: %w", err)
+	}
+	return repoUsers(users)
 }
 
 func (u *userRepository) FindByEmail(ctx context.Context, email string) (*repos.UserModel, error) {

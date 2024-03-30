@@ -26,6 +26,7 @@ import (
 
 type UserService interface {
 	Find(ctx context.Context, id ulid.ULID) (*repos.UserModel, error)
+	FindAll(ctx context.Context) ([]*repos.UserModel, error)
 	FindByEmail(ctx context.Context, email string) (*repos.UserModel, error)
 	Create(ctx context.Context, name, email, password string) (*repos.UserModel, error)
 	Update(ctx context.Context, id ulid.ULID, name string) error
@@ -38,7 +39,7 @@ type UserService interface {
 	GetPasskey(ctx context.Context, userID, id ulid.ULID) (*repos.Passkey, error)
 	UpdatePasskey(ctx context.Context, userID, id ulid.ULID, name string) error
 	DeletePasskey(ctx context.Context, userID, id ulid.ULID) error
-	Delete(ctx context.Context, id ulid.ULID, password string) error
+	Delete(ctx context.Context, id ulid.ULID) error
 }
 
 type userService struct {
@@ -57,6 +58,10 @@ func NewUserService(userRepository repos.UserRepository, authService AuthService
 
 func (u *userService) Find(ctx context.Context, id ulid.ULID) (*repos.UserModel, error) {
 	return u.userRepo.Find(ctx, id)
+}
+
+func (u *userService) FindAll(ctx context.Context) ([]*repos.UserModel, error) {
+	return u.userRepo.FindAll(ctx)
 }
 
 func (u *userService) FindByEmail(ctx context.Context, email string) (*repos.UserModel, error) {
@@ -205,11 +210,7 @@ func (u *userService) DeletePasskey(ctx context.Context, userID, id ulid.ULID) e
 	return u.userRepo.DeletePasskey(ctx, userID, id)
 }
 
-func (u *userService) Delete(ctx context.Context, id ulid.ULID, password string) error {
-	if err := u.authService.VerifyPasswordByID(ctx, id, password); err != nil {
-		return fmt.Errorf("delete user: %w", err)
-	}
-
+func (u *userService) Delete(ctx context.Context, id ulid.ULID) error {
 	err := u.userRepo.Delete(ctx, id)
 	if err != nil {
 		return err

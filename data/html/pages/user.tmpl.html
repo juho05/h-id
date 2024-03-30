@@ -1,0 +1,21 @@
+{{define "title"}}{{.Data.Name}}{{end}}
+
+{{define "main"}}
+<div class="form-panel">
+  <h2 class="form-title">{{.Data.Name}}</h2>
+  <div class="form">
+    <div>
+      <label class="input-label" for="id">{{translate .Lang "id"}}:</label>
+      <input id="id" type="text" name="id" value="{{.Data.ID}}" readonly>
+
+      <label class="input-label" for="email">{{translate .Lang "email"}}:</label>
+      <input id="email" type="email" name="email" value="{{.Data.Email}}" readonly>
+
+      <label class="input-label">{{translate .Lang "isAdmin"}}: {{.Data.IsAdmin}}</label>
+    </div>
+    <div class="submit-div">
+      <a class="btn btn-red" href="/confirm?type=delete&name={{.Data.Name}}&url=/admin/user/{{.Data.ID}}/delete">{{translate .Lang "delete"}}</a>
+    </div>
+  </div>
+</div>
+{{end}}

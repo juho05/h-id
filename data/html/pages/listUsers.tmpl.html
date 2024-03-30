@@ -1,0 +1,17 @@
+{{define "title"}}{{translate .Lang "listUsers"}}{{end}}
+
+{{define "main"}}
+<div id="list-apps-page" class="form-panel">
+  <h2 class="form-title">{{translate .Lang "listUsers"}}</h2>
+  <div id="list-apps-page-body">
+    <div id="create-btn-container">
+      <a id="list-apps-create" href="/admin/user/invite" class="btn">{{translate .Lang "invite"}}</a>
+    </div>
+    <div id="app-list">
+      {{range .Data.Users}}
+        <a href="/admin/user/{{.ID}}" class="app-list-entry clickable">{{.Name}}</a>
+      {{end}}
+    </div>
+  </div>
+</div>
+{{end}}
