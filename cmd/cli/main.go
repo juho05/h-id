@@ -51,7 +51,7 @@ func invite(authService services.AuthService, args []string) error {
 		fmt.Println("USAGE h-id-cli invite <email>")
 		os.Exit(1)
 	}
-	return authService.SendInvitation(context.Background(), args[0], "en")
+	return authService.SendInvitation(context.Background(), args[0], "en", true)
 }
 
 func run(args []string) error {

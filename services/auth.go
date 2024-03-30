@@ -54,7 +54,7 @@ type AuthService interface {
 	ResetPassword(ctx context.Context, token, newPassword string) error
 	UpdatePassword(ctx context.Context, userID ulid.ULID, password string) error
 
-	SendInvitation(ctx context.Context, email, lang string) error
+	SendInvitation(ctx context.Context, email, lang string, blocking bool) error
 	VerifyInvitationToken(ctx context.Context, email, token string) error
 
 	GenerateOTPKey(ctx context.Context, user *repos.UserModel) (*otp.Key, error)
@@ -515,7 +515,7 @@ func (a *authService) UpdatePassword(ctx context.Context, userID ulid.ULID, pass
 	return nil
 }
 
-func (a *authService) SendInvitation(ctx context.Context, email, lang string) error {
+func (a *authService) SendInvitation(ctx context.Context, email, lang string, blocking bool) error {
 	_, err := a.userRepo.FindByEmail(ctx, email)
 	if err == nil {
 		return repos.ErrExists
@@ -537,12 +537,17 @@ func (a *authService) SendInvitation(ctx context.Context, email, lang string) er
 	if err != nil {
 		return fmt.Errorf("send invitation: %w", err)
 	}
-	go func() {
+	fn := func() {
 		err := a.emailService.SendEmail(email, subject, "invitation", data)
 		if err != nil {
 			log.Errorf("Failed to send email: %w", err)
 		}
-	}()
+	}
+	if blocking {
+		fn()
+	} else {
+		go fn()
+	}
 	return nil
 }
 

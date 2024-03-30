@@ -147,7 +147,7 @@ func (h *Handler) adminInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
-	err := h.AuthService.SendInvitation(r.Context(), body.Email, lang)
+	err := h.AuthService.SendInvitation(r.Context(), body.Email, lang, false)
 	tmplData := h.newTemplateData(r)
 	if err != nil {
 		if errors.Is(err, repos.ErrExists) {
