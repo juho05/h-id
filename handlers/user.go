@@ -605,7 +605,16 @@ func (h *Handler) verifyPasskeyFinish(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
-	respondJSON(w, http.StatusOK, struct{}{})
+	type response struct {
+		Redirect string `json:"redirect"`
+	}
+	redirect := config.BaseURL()
+	if r := h.popRedirect(r, "login"); r != "" {
+		redirect = r
+	}
+	respondJSON(w, http.StatusOK, response{
+		Redirect: redirect,
+	})
 }
 
 // POST /user/logout

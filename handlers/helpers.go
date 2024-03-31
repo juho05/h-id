@@ -299,30 +299,41 @@ func (h *Handler) storeRedirect(r *http.Request, key string) {
 }
 
 func (h *Handler) redirect(w http.ResponseWriter, r *http.Request, key string) {
+	http.Redirect(w, r, h.popRedirect(r, key), http.StatusSeeOther)
+}
+
+func (h *Handler) getRedirect(r *http.Request, key string) string {
+	key = "redirect:" + key
+	if redirect := h.SessionManager.GetString(r.Context(), key); redirect != "" {
+		u, err := url.Parse(redirect)
+		if err == nil {
+			if u.IsAbs() {
+				if u.Hostname() == config.Domain() || h.AuthGatewayService.IsAllowedDomain(u.Hostname()) {
+					return redirect
+				}
+			} else {
+				return "/" + strings.TrimPrefix(redirect, "/")
+			}
+		}
+	}
+	return "/"
+}
+
+func (h *Handler) popRedirect(r *http.Request, key string) string {
 	key = "redirect:" + key
 	if redirect := h.SessionManager.PopString(r.Context(), key); redirect != "" {
 		u, err := url.Parse(redirect)
 		if err == nil {
 			if u.IsAbs() {
 				if u.Hostname() == config.Domain() || h.AuthGatewayService.IsAllowedDomain(u.Hostname()) {
-					http.Redirect(w, r, redirect, http.StatusSeeOther)
+					return redirect
 				}
 			} else {
-				http.Redirect(w, r, "/"+strings.TrimPrefix(redirect, "/"), http.StatusSeeOther)
+				return "/" + strings.TrimPrefix(redirect, "/")
 			}
 		}
 	}
-	http.Redirect(w, r, "/", http.StatusSeeOther)
-}
-
-func (h *Handler) getRedirect(r *http.Request, key string) string {
-	key = "redirect:" + key
-	return h.SessionManager.GetString(r.Context(), key)
-}
-
-func (h *Handler) popRedirect(r *http.Request, key string) string {
-	key = "redirect:" + key
-	return h.SessionManager.PopString(r.Context(), key)
+	return "/"
 }
 
 func notFound(w http.ResponseWriter) {

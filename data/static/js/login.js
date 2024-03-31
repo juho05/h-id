@@ -60,7 +60,12 @@ passkeyBtn.addEventListener("click", async (e) => {
       }
       return;
     }
-    location.href = "/";
+    try {
+      const data = await res2.json();
+      location.href = data.redirect || "/";
+    } catch {
+      location.href = "/";
+    }
   } catch (e) {
     alert("Action failed.")
   }
