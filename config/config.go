@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/juho05/log"
 )
@@ -167,6 +168,54 @@ func DBFile() (f string) {
 	}
 	os.MkdirAll(filepath.Dir(f), 0o755)
 	return f
+}
+
+func SessionLifetime() (d time.Duration) {
+	if a, ok := values["SESSION_LIFETIME"]; ok {
+		return a.(time.Duration)
+	}
+	defer func() {
+		values["SESSION_LIFETIME"] = d
+	}()
+	def := 3 * 24 * time.Hour
+	durStr := os.Getenv("SESSION_LIFETIME")
+	if durStr == "" {
+		return def
+	}
+	d, err := time.ParseDuration(durStr)
+	if err != nil {
+		log.Errorf("invalid SESSION_LIFETIME: %s", err)
+		return def
+	}
+	if d < time.Minute {
+		log.Errorf("invalid SESSION_LIFETIME: session lifetime must not be < 1min")
+		return def
+	}
+	return d
+}
+
+func SessionIdleTimeout() (d time.Duration) {
+	if a, ok := values["SESSION_IDLE_TIMEOUT"]; ok {
+		return a.(time.Duration)
+	}
+	defer func() {
+		values["SESSION_IDLE_TIMEOUT"] = d
+	}()
+	def := 24 * time.Hour
+	durStr := os.Getenv("SESSION_IDLE_TIMEOUT")
+	if durStr == "" {
+		return def
+	}
+	d, err := time.ParseDuration(durStr)
+	if err != nil {
+		log.Errorf("invalid SESSION_IDLE_TIMEOUT: %s", err)
+		return def
+	}
+	if d < time.Minute {
+		log.Errorf("invalid SESSION_IDLE_TIMEOUT: session idle timeout must not be < 1min")
+		return def
+	}
+	return d
 }
 
 func TLSCert() (path string) {

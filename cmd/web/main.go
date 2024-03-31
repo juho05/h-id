@@ -41,8 +41,8 @@ func run() error {
 
 	handler.SessionManager = scs.New()
 	handler.SessionManager.Store = db.NewSessionRepository()
-	handler.SessionManager.Lifetime = 72 * time.Hour
-	handler.SessionManager.IdleTimeout = 12 * time.Hour
+	handler.SessionManager.Lifetime = config.SessionLifetime()
+	handler.SessionManager.IdleTimeout = config.SessionIdleTimeout()
 	handler.SessionManager.Cookie.Secure = true
 	handler.SessionManager.Cookie.Name = "h-id_session"
 
