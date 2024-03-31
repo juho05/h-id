@@ -218,6 +218,35 @@ func SessionIdleTimeout() (d time.Duration) {
 	return d
 }
 
+func AuthGatewayConfig() (path string) {
+	if c, ok := values["AUTH_GATEWAY_CONFIG"]; ok {
+		return c.(string)
+	}
+	defer func() {
+		values["AUTH_GATEWAY_CONFIG"] = path
+	}()
+	path = os.Getenv("AUTH_GATEWAY_CONFIG")
+	if path == "" {
+		return ""
+	}
+	return path
+}
+
+func AuthGatewayDomain() (d string) {
+	if c, ok := values["AUTH_GATEWAY_DOMAIN"]; ok {
+		return c.(string)
+	}
+	defer func() {
+		values["AUTH_GATEWAY_DOMAIN"] = d
+	}()
+	def := Domain()
+	d = os.Getenv("AUTH_GATEWAY_DOMAIN")
+	if d == "" {
+		return def
+	}
+	return d
+}
+
 func TLSCert() (path string) {
 	if c, ok := values["TLS_CERT"]; ok {
 		return c.(string)

@@ -2,6 +2,7 @@
 database.sqlite
 database.sqlite-shm
 database.sqlite-wal
+gateway.json
 /data/tls/
 /data/rsa/
 /profile_pictures/

@@ -107,9 +107,27 @@ func (h *Handler) noauth(next http.Handler) http.Handler {
 
 func (h *Handler) auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		redirect := r.URL.RequestURI()
+		if r.URL.Path == "/gateway/verify" {
+			redirectProto := r.Header.Get("X-Forwarded-Proto")
+			redirectHost := r.Header.Get("X-Forwarded-Host")
+			redirectURI := r.Header.Get("X-Forwarded-Uri")
+			if !h.AuthGatewayService.IsAllowedDomain(redirectHost) {
+				clientError(w, http.StatusForbidden)
+				return
+			}
+			uri, err := url.Parse(redirectProto + "://" + redirectHost + redirectURI)
+			if err != nil || !uri.IsAbs() || uri.Host != redirectHost || uri.RequestURI() != redirectURI {
+				clientError(w, http.StatusBadRequest)
+				return
+			}
+			redirect = uri.String()
+		}
+		redirect = url.QueryEscape(redirect)
+
 		userID, ok := h.SessionManager.Get(r.Context(), "authUserID").(ulid.ULID)
 		if !ok {
-			http.Redirect(w, r, fmt.Sprintf("/user/login?redirect=%s", url.QueryEscape(r.URL.RequestURI())), http.StatusSeeOther)
+			http.Redirect(w, r, fmt.Sprintf("%s/user/login?redirect=%s", config.BaseURL(), redirect), http.StatusSeeOther)
 			return
 		}
 
@@ -117,33 +135,33 @@ func (h *Handler) auth(next http.Handler) http.Handler {
 			confirmed, err := h.AuthService.IsEmailConfirmed(r.Context(), userID)
 			if err != nil {
 				h.SessionManager.Destroy(r.Context())
-				http.Redirect(w, r, fmt.Sprintf("/user/login?redirect=%s", url.QueryEscape(r.URL.RequestURI())), http.StatusSeeOther)
+				http.Redirect(w, r, fmt.Sprintf("%s/user/login?redirect=%s", config.BaseURL(), redirect), http.StatusSeeOther)
 				return
 			}
 			if !confirmed {
-				http.Redirect(w, r, fmt.Sprintf("/user/confirmEmail?redirect=%s", url.QueryEscape(r.URL.RequestURI())), http.StatusSeeOther)
+				http.Redirect(w, r, fmt.Sprintf("%s/user/confirmEmail?redirect=%s", config.BaseURL(), redirect), http.StatusSeeOther)
 				return
 			}
 
 			otpActive, err := h.AuthService.IsOTPActive(r.Context(), userID)
 			if err != nil {
 				h.SessionManager.Destroy(r.Context())
-				http.Redirect(w, r, fmt.Sprintf("/user/login?redirect=%s", url.QueryEscape(r.URL.RequestURI())), http.StatusSeeOther)
+				http.Redirect(w, r, fmt.Sprintf("%s/user/login?redirect=%s", config.BaseURL(), redirect), http.StatusSeeOther)
 				return
 			}
 			if !otpActive {
-				http.Redirect(w, r, fmt.Sprintf("/user/2fa/otp/activate?redirect=%s", url.QueryEscape(r.URL.RequestURI())), http.StatusSeeOther)
+				http.Redirect(w, r, fmt.Sprintf("%s/user/2fa/otp/activate?redirect=%s", config.BaseURL(), redirect), http.StatusSeeOther)
 				return
 			}
 
 			hasRecovery, err := h.AuthService.HasRecoveryCodes(r.Context(), userID)
 			if err != nil {
 				h.SessionManager.Destroy(r.Context())
-				http.Redirect(w, r, fmt.Sprintf("/user/login?redirect=%s", url.QueryEscape(r.URL.RequestURI())), http.StatusSeeOther)
+				http.Redirect(w, r, fmt.Sprintf("%s/user/login?redirect=%s", config.BaseURL(), redirect), http.StatusSeeOther)
 				return
 			}
 			if !hasRecovery {
-				http.Redirect(w, r, fmt.Sprintf("/user/2fa/recovery?redirect=%s", url.QueryEscape(r.URL.RequestURI())), http.StatusSeeOther)
+				http.Redirect(w, r, fmt.Sprintf("%s/user/2fa/recovery?redirect=%s", config.BaseURL(), redirect), http.StatusSeeOther)
 				return
 			}
 		}

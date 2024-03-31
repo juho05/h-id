@@ -12,14 +12,15 @@ import (
 )
 
 type Handler struct {
-	Router         chi.Router
-	Renderer       Renderer
-	AuthService    services.AuthService
-	UserService    services.UserService
-	ClientService  services.ClientService
-	SessionManager *scs.SessionManager
-	EmailService   services.EmailService
-	StaticFS       fs.FS
+	Router             chi.Router
+	Renderer           Renderer
+	AuthService        services.AuthService
+	UserService        services.UserService
+	ClientService      services.ClientService
+	SessionManager     *scs.SessionManager
+	EmailService       services.EmailService
+	AuthGatewayService services.AuthGatewayService
+	StaticFS           fs.FS
 }
 
 func NewHandler() *Handler {

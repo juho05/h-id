@@ -83,9 +83,9 @@ func (h *Handler) userSignUpPage(w http.ResponseWriter, r *http.Request) {
 		LoginRedirect string
 	}
 	tmplData := h.newTemplateData(r)
-	if redirect := h.SessionManager.GetString(r.Context(), "loginRedirect"); redirect != "" {
+	if redirect := h.getRedirect(r, "login"); redirect != "" {
 		tmplData.Data = data{
-			LoginRedirect: url.QueryEscape(redirect),
+			LoginRedirect: redirect,
 		}
 	}
 	if config.HCaptchaSiteKey() != "" {
@@ -117,7 +117,7 @@ func (h *Handler) userSignUp(w http.ResponseWriter, r *http.Request) {
 		LoginRedirect string
 	}
 	data := h.newTemplateDataWithData(r, tmplData{
-		LoginRedirect: url.QueryEscape(h.SessionManager.GetString(r.Context(), "loginRedirect")),
+		LoginRedirect: h.getRedirect(r, "login"),
 	})
 	body, ok := decodeAndValidateBodyWithCaptcha[request](h, w, r, "signup", &data)
 	if !ok {
@@ -164,26 +164,11 @@ func (h *Handler) userSignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if redirect := h.SessionManager.PopString(r.Context(), "loginRedirect"); redirect != "" {
-		http.Redirect(w, r, redirect, http.StatusSeeOther)
-		return
-	}
-	http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+	h.redirect(w, r, "login")
 }
 
 func (h *Handler) userLoginPage(w http.ResponseWriter, r *http.Request) {
-	if redirect := r.URL.Query().Get("redirect"); redirect != "" {
-		u, err := url.Parse(redirect)
-		if err == nil {
-			if u.IsAbs() {
-				clientError(w, http.StatusBadRequest)
-				return
-			}
-			h.SessionManager.Put(r.Context(), "loginRedirect", "/"+strings.TrimPrefix(redirect, "/"))
-		}
-	} else {
-		h.SessionManager.Remove(r.Context(), "loginRedirect")
-	}
+	h.storeRedirect(r, "login")
 	data := h.newTemplateData(r)
 	type form struct {
 		Email string
@@ -222,7 +207,7 @@ func (h *Handler) userLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	if !user.OTPActive {
 		redirectQuery := ""
-		if redirect := h.SessionManager.PopString(r.Context(), "loginRedirect"); redirect != "" {
+		if redirect := h.popRedirect(r, "login"); redirect != "" {
 			redirectQuery = "?redirect=" + url.QueryEscape(redirect)
 		}
 		http.Redirect(w, r, "/user/2fa/otp/activate"+redirectQuery, http.StatusSeeOther)
@@ -329,7 +314,7 @@ func (h *Handler) verifyOTPPage(w http.ResponseWriter, r *http.Request) {
 	userID, ok := h.SessionManager.Get(r.Context(), "validPassword").(ulid.ULID)
 	if !ok || userID == (ulid.ULID{}) {
 		redirectQuery := ""
-		if redirect := h.SessionManager.PopString(r.Context(), "loginRedirect"); redirect != "" {
+		if redirect := h.popRedirect(r, "login"); redirect != "" {
 			redirectQuery = "?redirect=" + url.QueryEscape(redirect)
 		}
 		http.Redirect(w, r, "/user/login"+redirectQuery, http.StatusSeeOther)
@@ -347,11 +332,7 @@ func (h *Handler) verifyOTPPage(w http.ResponseWriter, r *http.Request) {
 			serverError(w, err)
 			return
 		}
-		if redirect := h.SessionManager.PopString(r.Context(), "loginRedirect"); redirect != "" {
-			http.Redirect(w, r, redirect, http.StatusSeeOther)
-			return
-		}
-		http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+		h.redirect(w, r, "login")
 		return
 	}
 	h.Renderer.render(w, r, http.StatusOK, "verifyOTP", h.newTemplateData(r))
@@ -370,7 +351,7 @@ func (h *Handler) verifyOTP(w http.ResponseWriter, r *http.Request) {
 	userID, ok := h.SessionManager.Get(r.Context(), "validPassword").(ulid.ULID)
 	if !ok || userID == (ulid.ULID{}) {
 		redirectQuery := ""
-		if redirect := h.SessionManager.PopString(r.Context(), "loginRedirect"); redirect != "" {
+		if redirect := h.popRedirect(r, "login"); redirect != "" {
 			redirectQuery = "?redirect=" + url.QueryEscape(redirect)
 		}
 		http.Redirect(w, r, "/user/login"+redirectQuery, http.StatusSeeOther)
@@ -406,11 +387,7 @@ func (h *Handler) verifyOTP(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, remember2FACookie)
 
-	if redirect := h.SessionManager.PopString(r.Context(), "loginRedirect"); redirect != "" {
-		http.Redirect(w, r, redirect, http.StatusSeeOther)
-		return
-	}
-	http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+	h.redirect(w, r, "login")
 }
 
 // GET /user/passkey
@@ -643,30 +620,14 @@ func (h *Handler) userLogout(w http.ResponseWriter, r *http.Request) {
 
 // GET /user/confirmEmail
 func (h *Handler) userConfirmEmailPage(w http.ResponseWriter, r *http.Request) {
-	if redirect := r.URL.Query().Get("redirect"); redirect != "" {
-		u, err := url.Parse(redirect)
-		if err == nil {
-			if u.IsAbs() {
-				clientError(w, http.StatusBadRequest)
-				return
-			}
-			h.SessionManager.Put(r.Context(), "confirmEmailRedirect", "/"+strings.TrimPrefix(redirect, "/"))
-		}
-	} else {
-		h.SessionManager.Remove(r.Context(), "confirmEmailRedirect")
-	}
-
+	h.storeRedirect(r, "confirmEmail")
 	user, ok := h.authUser(w, r)
 	if !ok {
 		return
 	}
 
 	if user.EmailConfirmed {
-		if redirect := h.SessionManager.PopString(r.Context(), "confirmEmailRedirect"); redirect != "" {
-			http.Redirect(w, r, redirect, http.StatusSeeOther)
-			return
-		}
-		http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+		h.redirect(w, r, "confirmEmail")
 		return
 	}
 
@@ -710,11 +671,7 @@ func (h *Handler) userConfirmEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if redirect := h.SessionManager.PopString(r.Context(), "confirmEmailRedirect"); redirect != "" {
-		http.Redirect(w, r, redirect, http.StatusSeeOther)
-		return
-	}
-	http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+	h.redirect(w, r, "confirmEmail")
 }
 
 // GET/POST /user/info
@@ -755,29 +712,14 @@ func (h *Handler) userInfo(w http.ResponseWriter, r *http.Request) {
 
 // GET /user/2fa/otp/activate
 func (h *Handler) userActivateOTPPage(w http.ResponseWriter, r *http.Request) {
-	if redirect := r.URL.Query().Get("redirect"); redirect != "" {
-		u, err := url.Parse(redirect)
-		if err == nil {
-			if u.IsAbs() {
-				clientError(w, http.StatusBadRequest)
-				return
-			}
-			h.SessionManager.Put(r.Context(), "activateOTPRedirect", "/"+strings.TrimPrefix(redirect, "/"))
-		}
-	} else {
-		h.SessionManager.Remove(r.Context(), "activateOTPRedirect")
-	}
+	h.storeRedirect(r, "activateOTP")
 
 	userID := h.AuthService.AuthenticatedUserID(r.Context())
 	if userID == (ulid.ULID{}) {
 		var ok bool
 		userID, ok = h.SessionManager.Get(r.Context(), "validPassword").(ulid.ULID)
 		if !ok || userID == (ulid.ULID{}) {
-			if redirect := h.SessionManager.PopString(r.Context(), "activateOTPRedirect"); redirect != "" {
-				http.Redirect(w, r, redirect, http.StatusSeeOther)
-			} else {
-				http.Redirect(w, r, "/", http.StatusSeeOther)
-			}
+			h.redirect(w, r, "activateOTP")
 			return
 		}
 	}
@@ -788,11 +730,7 @@ func (h *Handler) userActivateOTPPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if user.OTPActive {
-		if redirect := h.SessionManager.PopString(r.Context(), "activateOTPRedirect"); redirect != "" {
-			http.Redirect(w, r, redirect, http.StatusSeeOther)
-			return
-		}
-		http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+		h.redirect(w, r, "activateOTP")
 		return
 	}
 
@@ -818,11 +756,7 @@ func (h *Handler) userActivateOTP(w http.ResponseWriter, r *http.Request) {
 		var ok bool
 		userID, ok = h.SessionManager.Get(r.Context(), "validPassword").(ulid.ULID)
 		if !ok || userID == (ulid.ULID{}) {
-			if redirect := h.SessionManager.PopString(r.Context(), "activateOTPRedirect"); redirect != "" {
-				http.Redirect(w, r, redirect, http.StatusSeeOther)
-			} else {
-				http.Redirect(w, r, "/", http.StatusSeeOther)
-			}
+			h.redirect(w, r, "activateOTP")
 			return
 		}
 	}
@@ -859,11 +793,7 @@ func (h *Handler) userActivateOTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if redirect := h.SessionManager.PopString(r.Context(), "activateOTPRedirect"); redirect != "" {
-		http.Redirect(w, r, redirect, http.StatusSeeOther)
-		return
-	}
-	http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+	h.redirect(w, r, "activateOTP")
 }
 
 // GET /user/2fa/otp/activate/qr
@@ -915,18 +845,7 @@ func (h *Handler) userActivateOTPQRCode(w http.ResponseWriter, r *http.Request) 
 
 // GET /user/2fa/recovery
 func (h *Handler) recoveryCodesPage(w http.ResponseWriter, r *http.Request) {
-	if redirect := r.URL.Query().Get("redirect"); redirect != "" {
-		u, err := url.Parse(redirect)
-		if err == nil {
-			if u.IsAbs() {
-				clientError(w, http.StatusBadRequest)
-				return
-			}
-			h.SessionManager.Put(r.Context(), "recoveryCodesRedirect", "/"+strings.TrimPrefix(redirect, "/"))
-		}
-	} else {
-		h.SessionManager.Remove(r.Context(), "recoveryCodesRedirect")
-	}
+	h.storeRedirect(r, "recoveryCodes")
 	userID := h.AuthService.AuthenticatedUserID(r.Context())
 	has, err := h.AuthService.HasRecoveryCodes(r.Context(), userID)
 	if err != nil {
@@ -955,11 +874,7 @@ func (h *Handler) recoveryCodesPage(w http.ResponseWriter, r *http.Request) {
 // POST /user/2fa/recovery
 func (h *Handler) recoveryCodes(w http.ResponseWriter, r *http.Request) {
 	if h.SessionManager.PopBool(r.Context(), "recoveryCodesDownloaded") {
-		if redirect := h.SessionManager.PopString(r.Context(), "recoveryCodesRedirect"); redirect != "" {
-			http.Redirect(w, r, redirect, http.StatusSeeOther)
-			return
-		}
-		http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+		h.redirect(w, r, "recoveryCodes")
 		return
 	}
 	type request struct {

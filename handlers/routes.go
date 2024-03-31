@@ -36,6 +36,7 @@ func (h *Handler) RegisterRoutes() {
 	h.Router.With(corsHeaders, h.SessionManager.LoadAndSave).Route("/oauth", h.oauthRoutes)
 	h.Router.With(h.SessionManager.LoadAndSave, csrf, h.auth).Route("/app", h.appRoutes)
 	h.Router.With(h.SessionManager.LoadAndSave, csrf, h.auth).Get("/confirm", h.confirm)
+	h.Router.With(h.SessionManager.LoadAndSave, csrf, h.auth).Route("/gateway", h.authGatewayRoutes)
 }
 
 func (h *Handler) registerStaticRouts() {

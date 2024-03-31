@@ -45,6 +45,7 @@ func run() error {
 	handler.SessionManager.IdleTimeout = config.SessionIdleTimeout()
 	handler.SessionManager.Cookie.Secure = true
 	handler.SessionManager.Cookie.Name = "h-id_session"
+	handler.SessionManager.Cookie.Domain = config.AuthGatewayDomain()
 
 	emailService := services.NewEmailService(hid.EmailFS)
 
@@ -59,6 +60,11 @@ func run() error {
 	handler.Renderer, err = handlers.NewRenderer(hid.HTMLFS)
 	if err != nil {
 		return fmt.Errorf("Failed to initialize renderer: %w", err)
+	}
+
+	handler.AuthGatewayService, err = services.NewAuthGatewayService()
+	if err != nil {
+		return fmt.Errorf("Failed to initialize auth gateway service: %w", err)
 	}
 
 	handler.StaticFS = hid.StaticFS
