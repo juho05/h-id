@@ -48,6 +48,8 @@ func (h *Handler) userRoutes(r chi.Router) {
 	r.Get("/2fa/otp/activate", h.userActivateOTPPage)
 	r.With(rateLimit(2, time.Second)).Post("/2fa/otp/activate", h.userActivateOTP)
 	r.Get("/2fa/otp/activate/qr", h.userActivateOTPQRCode)
+	r.With(h.auth).Get("/2fa/otp/reset", h.newPage("resetOTP"))
+	r.With(h.auth, rateLimit(2, time.Second)).Post("/2fa/otp/reset", h.resetOTP)
 
 	r.With(h.auth).Get("/2fa/recovery", h.recoveryCodesPage)
 	r.With(h.auth).Post("/2fa/recovery", h.recoveryCodes)
@@ -852,6 +854,37 @@ func (h *Handler) userActivateOTPQRCode(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+// POST /user/2fa/otp/reset
+func (h *Handler) resetOTP(w http.ResponseWriter, r *http.Request) {
+	userID := h.AuthService.AuthenticatedUserID(r.Context())
+	type request struct {
+		Password string `form:"password" validate:"required"`
+	}
+	body, ok := decodeAndValidateBody[request](h, w, r, "resetOTP", nil)
+	if !ok {
+		return
+	}
+
+	tmplData := h.newTemplateData(r)
+	err := h.AuthService.DisableOTP(r.Context(), userID, body.Password)
+	if err != nil {
+		if errors.Is(err, services.ErrInvalidCredentials) {
+			lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
+			tmplData.FieldErrors["Password"] = services.MustTranslate(lang, "wrongPassword")
+			h.Renderer.render(w, r, http.StatusUnprocessableEntity, "resetOTP", tmplData)
+		} else {
+			serverError(w, err)
+		}
+		return
+	}
+	err = h.AuthService.RemoveRemember2FACookie(r.Context(), userID, w, r)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	http.Redirect(w, r, "/user/2fa/otp/activate", http.StatusSeeOther)
+}
+
 // GET /user/2fa/recovery
 func (h *Handler) recoveryCodesPage(w http.ResponseWriter, r *http.Request) {
 	h.storeRedirect(r, "recoveryCodes")
@@ -902,13 +935,8 @@ func (h *Handler) recoveryCodes(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// POST /user/2fa/recovery/reset
 func (h *Handler) resetRecoveryCodes(w http.ResponseWriter, r *http.Request) {
-	user, err := h.UserService.Find(r.Context(), h.AuthService.AuthenticatedUserID(r.Context()))
-	if err != nil {
-		serverError(w, err)
-		return
-	}
-
 	type request struct {
 		Password string `form:"password" validate:"required"`
 	}
@@ -918,7 +946,7 @@ func (h *Handler) resetRecoveryCodes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tmplData := h.newTemplateData(r)
-	err = h.AuthService.DeleteRecoveryCodes(r.Context(), user.ID, body.Password)
+	err := h.AuthService.DeleteRecoveryCodes(r.Context(), h.AuthService.AuthenticatedUserID(r.Context()), body.Password)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidCredentials) {
 			lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))

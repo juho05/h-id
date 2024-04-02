@@ -61,6 +61,7 @@ type AuthService interface {
 	ActivateOTPKey(ctx context.Context, userID ulid.ULID, code string) error
 	VerifyOTPCode(ctx context.Context, userID ulid.ULID, code string) error
 	IsOTPActive(ctx context.Context, id ulid.ULID) (bool, error)
+	DisableOTP(ctx context.Context, id ulid.ULID, password string) error
 
 	HasRecoveryCodes(ctx context.Context, userID ulid.ULID) (bool, error)
 	GenerateRecoveryCodes(ctx context.Context, userID ulid.ULID) ([]string, error)
@@ -68,6 +69,7 @@ type AuthService interface {
 
 	CreateRemember2FACookie(ctx context.Context, userID ulid.ULID) (*http.Cookie, error)
 	VerifyRemember2FACookie(ctx context.Context, userID ulid.ULID, r *http.Request) error
+	RemoveRemember2FACookie(ctx context.Context, userID ulid.ULID, w http.ResponseWriter, r *http.Request) error
 
 	PasskeyBeginRegistration(ctx context.Context, user *repos.UserModel, password, passkeyName string) (*protocol.CredentialCreation, error)
 	PasskeyFinishRegistration(ctx context.Context, user *repos.UserModel, req *http.Request) error
@@ -616,6 +618,19 @@ func (a *authService) IsOTPActive(ctx context.Context, id ulid.ULID) (bool, erro
 	return user.OTPActive, nil
 }
 
+func (a *authService) DisableOTP(ctx context.Context, userID ulid.ULID, password string) error {
+	err := a.VerifyPasswordByID(ctx, userID, password)
+	if err != nil {
+		return fmt.Errorf("disable OTP: %w", err)
+	}
+	err = a.userRepo.UpdateOTP(ctx, userID, false, nil)
+	if err != nil {
+		return fmt.Errorf("disable OTP: %w", err)
+	}
+	a.sessionManager.Remove(ctx, "otpActive")
+	return nil
+}
+
 func (a *authService) GenerateOTPKey(ctx context.Context, user *repos.UserModel) (*otp.Key, error) {
 	key, err := totp.Generate(totp.GenerateOpts{
 		Issuer:      "H-ID",
@@ -753,6 +768,25 @@ func (a *authService) VerifyRemember2FACookie(ctx context.Context, userID ulid.U
 		return ErrInvalidCredentials
 	}
 	return nil
+}
+
+func (a *authService) RemoveRemember2FACookie(ctx context.Context, userID ulid.ULID, w http.ResponseWriter, r *http.Request) error {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "remember-2fa",
+		Value:    "",
+		Path:     "/user/2fa",
+		Expires:  time.Unix(0, 0),
+		MaxAge:   -1,
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+	})
+	cookie, err := r.Cookie("remember-2fa")
+	if err != nil {
+		return ErrInvalidCredentials
+	}
+	tokenHash := hashToken(cookie.Value)
+	return a.userRepo.DeleteRemember2FAToken(ctx, userID, tokenHash)
 }
 
 func (a *authService) PasskeyBeginRegistration(ctx context.Context, user *repos.UserModel, password, name string) (*protocol.CredentialCreation, error) {

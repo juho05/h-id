@@ -73,7 +73,7 @@ var translations = map[string]map[string]string{
 		"resetPassword":                   "Reset Password",
 		"newPassword":                     "New password",
 		"expiredPasswordResetToken":       "Expired reset token.",
-		"resetRecoveryCodesLink":          "Reset recovery codes",
+		"resetRecoveryCodesLink":          "reset recovery codes",
 		"resetRecoveryCodes":              "Reset Recovery Codes",
 		"reset":                           "Reset",
 		"recoveryCodes":                   "Recovery Codes",
@@ -93,7 +93,7 @@ var translations = map[string]map[string]string{
 		"clientSecretWarning":             "This is the only time you will be shown the client secret. Copy it now and store it somewhere safe.",
 		"done":                            "Done",
 		"secret":                          "Secret",
-		"managePasskeys":                  "Manage passkeys",
+		"managePasskeys":                  "manage passkeys",
 		"passkeys":                        "Passkeys",
 		"passkey":                         "Passkey",
 		"createPasskey":                   "Create Passkey",
@@ -114,6 +114,8 @@ var translations = map[string]map[string]string{
 		"accountWithEmailDeletedByAdmin2": "has been deleted by an administrator",
 		"confirmName":                     "Confirm name",
 		"confirmNameWrong":                "Please type the name of the item you want to delete.",
+		"resetOTP":                        "Reset OTP",
+		"resetOTPLink":                    "reset OTP",
 	},
 	"de": {
 		"submit":                          "Submit",
@@ -222,6 +224,8 @@ var translations = map[string]map[string]string{
 		"accountWithEmailDeletedByAdmin2": "wurde von einem Administrator gelöscht",
 		"confirmName":                     "Name bestätigen",
 		"confirmNameWrong":                "Bitte schreibe den Namen des Objektes, das du löschen möchtest.",
+		"resetOTP":                        "OTP Zurücksetzen",
+		"resetOTPLink":                    "OTP zurücksetzen",
 	},
 }
 

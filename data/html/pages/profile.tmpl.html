@@ -35,7 +35,11 @@
 
       <label class="input-label" for="email">{{translate .Lang "email"}}:</label>
       <a href="/user/changeEmail" id="email" class="clickable">{{.Data.Email}}</a>
-      <a class="link" href="/user/2fa/recovery/reset">{{translate .Lang "resetRecoveryCodesLink"}}</a>
+      <span>
+        <a class="link" href="/user/2fa/otp/reset">{{translate .Lang "resetOTPLink"}}</a>
+        <span> / </span>
+        <a class="link" href="/user/2fa/recovery/reset">{{translate .Lang "resetRecoveryCodesLink"}}</a>
+      </span>
       <br>
       <a class="link" href="/user/passkey">{{translate .Lang "managePasskeys"}}</a>
     </div>

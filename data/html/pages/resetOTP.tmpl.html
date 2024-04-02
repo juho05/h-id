@@ -1,0 +1,26 @@
+{{define "title"}}{{translate .Lang "resetOTP"}}{{end}}
+
+{{define "main"}}
+<div class="form-panel">
+  <h2 class="form-title">{{translate .Lang "resetOTP"}}</h2>
+  {{with .Errors}}
+  <ul class="error-list">
+    {{range .}}
+    <li>{{.}}</li>
+    {{end}}
+  </ul>
+  {{end}}
+  <form class="form" action="/user/2fa/otp/reset" method="POST">
+    <div>
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+      <label class="input-label" for="password">{{translate .Lang "password"}}:</label>
+      <input class="{{if .FieldErrors.Password}}invalid-field{{end}}" id="password" type="password" name="password" required autofocus>
+      {{with .FieldErrors.Password}}<label class="error-label" for="password">{{.}}</label>{{end}}
+    </div>
+    <div class="submit-div">
+      <input class="btn" type="submit" value="{{translate .Lang "reset"}}">
+    </div>
+  </form>
+</div>
+{{end}}
