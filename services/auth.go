@@ -53,6 +53,7 @@ type AuthService interface {
 	RequestForgotPassword(ctx context.Context, lang, email string) error
 	ResetPassword(ctx context.Context, token, newPassword string) error
 	UpdatePassword(ctx context.Context, userID ulid.ULID, password string) error
+	CheckLoginPrerequisites(ctx context.Context) (emailConfirmed, otpActive, hasRefreshTokens bool, err error)
 
 	SendInvitation(ctx context.Context, email, lang string, blocking bool) error
 	VerifyInvitationToken(ctx context.Context, email, token string) error
@@ -601,6 +602,30 @@ func (a *authService) IsEmailConfirmed(ctx context.Context, id ulid.ULID) (bool,
 		a.sessionManager.Put(ctx, "emailConfirmed", user.EmailConfirmed)
 	}
 	return user.EmailConfirmed, nil
+}
+
+func (a *authService) CheckLoginPrerequisites(ctx context.Context) (emailConfirmed, otpActive, hasRefreshTokens bool, err error) {
+	authUser := a.AuthenticatedUserID(ctx)
+	if a.sessionManager.Exists(ctx, "emailConfirmed") && a.sessionManager.Exists(ctx, "otpActive") && a.sessionManager.Exists(ctx, "recoveryCodeCount") {
+		return a.sessionManager.GetBool(ctx, "emailConfirmed"), a.sessionManager.GetBool(ctx, "otpActive"), a.sessionManager.GetInt(ctx, "recoveryCodeCount") > 0, nil
+	}
+	user, err := a.userRepo.Find(ctx, authUser)
+	if err != nil {
+		return false, false, false, fmt.Errorf("check login prerequisites: %w", err)
+	}
+	a.sessionManager.Put(ctx, "emailConfirmed", user.EmailConfirmed)
+	a.sessionManager.Put(ctx, "otpActive", user.OTPActive)
+	var recoveryCodeCount int
+	if a.sessionManager.Exists(ctx, "recoveryCodeCount") {
+		recoveryCodeCount = a.sessionManager.GetInt(ctx, "recoveryCodeCount")
+	} else {
+		recoveryCodeCount, err = a.userRepo.CountRecoveryCodes(ctx, authUser)
+		if err != nil {
+			return false, false, false, fmt.Errorf("check login prerequisites: %w", err)
+		}
+		a.sessionManager.Put(ctx, "recoveryCodeCount", recoveryCodeCount)
+	}
+	return user.EmailConfirmed, user.OTPActive, recoveryCodeCount > 0, nil
 }
 
 func (a *authService) IsOTPActive(ctx context.Context, id ulid.ULID) (bool, error) {

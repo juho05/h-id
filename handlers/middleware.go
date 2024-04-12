@@ -132,7 +132,7 @@ func (h *Handler) auth(next http.Handler) http.Handler {
 		}
 
 		if !slices.Contains([]string{"/user/logout", "/user/confirmEmail", "/user/2fa/otp/activate", "/user/2fa/recovery"}, r.URL.Path) {
-			confirmed, err := h.AuthService.IsEmailConfirmed(r.Context(), userID)
+			confirmed, otpActive, hasRecovery, err := h.AuthService.CheckLoginPrerequisites(r.Context())
 			if err != nil {
 				h.SessionManager.Destroy(r.Context())
 				http.Redirect(w, r, fmt.Sprintf("%s/user/login?redirect=%s", config.BaseURL(), redirect), http.StatusSeeOther)
@@ -142,22 +142,8 @@ func (h *Handler) auth(next http.Handler) http.Handler {
 				http.Redirect(w, r, fmt.Sprintf("%s/user/confirmEmail?redirect=%s", config.BaseURL(), redirect), http.StatusSeeOther)
 				return
 			}
-
-			otpActive, err := h.AuthService.IsOTPActive(r.Context(), userID)
-			if err != nil {
-				h.SessionManager.Destroy(r.Context())
-				http.Redirect(w, r, fmt.Sprintf("%s/user/login?redirect=%s", config.BaseURL(), redirect), http.StatusSeeOther)
-				return
-			}
 			if !otpActive {
 				http.Redirect(w, r, fmt.Sprintf("%s/user/2fa/otp/activate?redirect=%s", config.BaseURL(), redirect), http.StatusSeeOther)
-				return
-			}
-
-			hasRecovery, err := h.AuthService.HasRecoveryCodes(r.Context(), userID)
-			if err != nil {
-				h.SessionManager.Destroy(r.Context())
-				http.Redirect(w, r, fmt.Sprintf("%s/user/login?redirect=%s", config.BaseURL(), redirect), http.StatusSeeOther)
 				return
 			}
 			if !hasRecovery {

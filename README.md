@@ -26,6 +26,9 @@ H-ID is an [OpenID Connect](https://openid.net/connect/) identity provider and a
 - Auth gateway
   - Assign groups to users
   - Allow access per (sub)domain for users/groups
+- Interface
+  - Mobile & desktop layout
+  - Automatic light/dark mode
 
 ## Installation (Linux with docker-compose)
 
@@ -43,7 +46,7 @@ services:
     restart: unless-stopped
     user: 1000:1000                     # change to your uid:gid combination
     environment:
-      - BASE_URL=https://id.example.com    # the URL where you plan to host H-ID
+      - BASE_URL=https://id.example.com # the URL where you plan to host H-ID
       - BEHIND_PROXY=true               # you should always host H-ID behind a reverse proxy
       - INVITE_ONLY=false               # set to true if you want to disable user sign-up without invitation
       - EMAIL_HOST=<smtp-host>          # SMTP host, e.g. smtp.gmail.com:587
@@ -163,7 +166,7 @@ my-service.example.com {
 **Bold**: required
 
 | Name                 | Values                                                       | Default                                                    | Description                                                                                                                    |
-|----------------------|--------------------------------------------------------------|------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------|
+| -------------------- | ------------------------------------------------------------ | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | **BASE_URL**         | e.g. `https://example.com`, `https://foo.example.com`        | *empty*                                                    | The base URL where H-ID is hosted                                                                                              |
 | **EMAIL_HOST**       | e.g. `smpt.google.com:587`                                   | *empty*                                                    | The SMTP host to use for sending emails                                                                                        |
 | **EMAIL_USERNAME**   | *string*                                                     | *empty*                                                    | The username of the email account to use for sending emails                                                                    |
