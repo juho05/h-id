@@ -39,7 +39,7 @@ func autoMigrate(db *sql.DB) error {
 }
 
 func Connect(filePath string) (repos.DB, error) {
-	connectionURL := fmt.Sprintf("file:%s?_txlock=immediate&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)&_pragma=cache_size(-50000)&_pragma=temp_store(memory)", filePath)
+	connectionURL := fmt.Sprintf("file:%s?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)", filePath)
 	rawDB, err := sql.Open("sqlite", connectionURL)
 	if err != nil {
 		return nil, err
