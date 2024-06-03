@@ -11,6 +11,7 @@ import (
 	hid "github.com/juho05/h-id"
 	"github.com/juho05/h-id/config"
 	"github.com/juho05/h-id/repos"
+	"github.com/juho05/h-id/repos/postgres"
 	"github.com/juho05/h-id/repos/sqlite"
 	"github.com/juho05/h-id/services"
 	"github.com/juho05/log"
@@ -55,11 +56,21 @@ func invite(authService services.AuthService, args []string) error {
 }
 
 func run(args []string) error {
-	db, err := sqlite.Connect(config.DBFile())
-	if err != nil {
-		return fmt.Errorf("connect to database: %w", err)
+	var db repos.DB
+	var err error
+	if config.PostgresHost() != "" {
+		db, err = postgres.Connect(postgres.ConstructDSN(config.PostgresDB(), config.PostgresHost(), config.PostgresPort(), config.PostgresUser(), config.PostgresPassword()))
+		if err != nil {
+			return fmt.Errorf("Failed to connect to Postgres database: %w", err)
+		}
+	} else {
+		db, err = sqlite.Connect(config.DBFile())
+		if err != nil {
+			return fmt.Errorf("Failed to connect to SQLITE database: %w", err)
+		}
 	}
 	defer db.Close()
+
 	userRepo := db.NewUserRepository()
 	tokenRepo := db.NewTokenRepository()
 	emailService := services.NewEmailService(hid.EmailFS)

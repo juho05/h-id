@@ -7,15 +7,18 @@ package db
 
 import (
 	"context"
-	"database/sql"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 const createToken = `-- name: CreateToken :one
-REPLACE INTO tokens (
+INSERT INTO tokens (
   created_at, category, token_key, value_hash, expires
 ) VALUES (
-  ?, ?, ?, ?, ?
-) RETURNING created_at, category, token_key, value_hash, expires
+  $1, $2, $3, $4, $5
+)
+ON CONFLICT(category,token_key) DO UPDATE SET created_at = $1, category = $2, token_key = $3, value_hash = $4, expires = $5
+RETURNING created_at, category, token_key, value_hash, expires
 `
 
 type CreateTokenParams struct {
@@ -27,7 +30,7 @@ type CreateTokenParams struct {
 }
 
 func (q *Queries) CreateToken(ctx context.Context, arg CreateTokenParams) (Token, error) {
-	row := q.db.QueryRowContext(ctx, createToken,
+	row := q.db.QueryRow(ctx, createToken,
 		arg.CreatedAt,
 		arg.Category,
 		arg.TokenKey,
@@ -46,7 +49,7 @@ func (q *Queries) CreateToken(ctx context.Context, arg CreateTokenParams) (Token
 }
 
 const deleteToken = `-- name: DeleteToken :execresult
-DELETE FROM tokens WHERE (category = ? AND token_key = ?) OR expires < ?3
+DELETE FROM tokens WHERE (category = $1 AND token_key = $2) OR expires < $3
 `
 
 type DeleteTokenParams struct {
@@ -55,12 +58,12 @@ type DeleteTokenParams struct {
 	Now      int64
 }
 
-func (q *Queries) DeleteToken(ctx context.Context, arg DeleteTokenParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, deleteToken, arg.Category, arg.TokenKey, arg.Now)
+func (q *Queries) DeleteToken(ctx context.Context, arg DeleteTokenParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, deleteToken, arg.Category, arg.TokenKey, arg.Now)
 }
 
 const findToken = `-- name: FindToken :one
-SELECT created_at, category, token_key, value_hash, expires FROM tokens WHERE category = ? AND token_key = ? AND expires > ?3
+SELECT created_at, category, token_key, value_hash, expires FROM tokens WHERE category = $1 AND token_key = $2 AND expires > $3
 `
 
 type FindTokenParams struct {
@@ -70,7 +73,7 @@ type FindTokenParams struct {
 }
 
 func (q *Queries) FindToken(ctx context.Context, arg FindTokenParams) (Token, error) {
-	row := q.db.QueryRowContext(ctx, findToken, arg.Category, arg.TokenKey, arg.Now)
+	row := q.db.QueryRow(ctx, findToken, arg.Category, arg.TokenKey, arg.Now)
 	var i Token
 	err := row.Scan(
 		&i.CreatedAt,
@@ -83,7 +86,7 @@ func (q *Queries) FindToken(ctx context.Context, arg FindTokenParams) (Token, er
 }
 
 const findTokenByValue = `-- name: FindTokenByValue :one
-SELECT created_at, category, token_key, value_hash, expires FROM tokens WHERE category = ? AND value_hash = ? AND expires > ?3
+SELECT created_at, category, token_key, value_hash, expires FROM tokens WHERE category = $1 AND value_hash = $2 AND expires > $3
 `
 
 type FindTokenByValueParams struct {
@@ -93,7 +96,7 @@ type FindTokenByValueParams struct {
 }
 
 func (q *Queries) FindTokenByValue(ctx context.Context, arg FindTokenByValueParams) (Token, error) {
-	row := q.db.QueryRowContext(ctx, findTokenByValue, arg.Category, arg.ValueHash, arg.Now)
+	row := q.db.QueryRow(ctx, findTokenByValue, arg.Category, arg.ValueHash, arg.Now)
 	var i Token
 	err := row.Scan(
 		&i.CreatedAt,

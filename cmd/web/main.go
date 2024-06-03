@@ -20,6 +20,8 @@ import (
 
 	"github.com/juho05/h-id/config"
 	"github.com/juho05/h-id/handlers"
+	"github.com/juho05/h-id/repos"
+	"github.com/juho05/h-id/repos/postgres"
 	"github.com/juho05/h-id/repos/sqlite"
 	"github.com/juho05/h-id/services"
 )
@@ -27,9 +29,18 @@ import (
 func run() error {
 	handler := handlers.NewHandler()
 
-	db, err := sqlite.Connect(config.DBFile())
-	if err != nil {
-		return fmt.Errorf("Failed to connect to database: %w", err)
+	var db repos.DB
+	var err error
+	if config.PostgresHost() != "" {
+		db, err = postgres.Connect(postgres.ConstructDSN(config.PostgresDB(), config.PostgresHost(), config.PostgresPort(), config.PostgresUser(), config.PostgresPassword()))
+		if err != nil {
+			return fmt.Errorf("Failed to connect to Postgres database: %w", err)
+		}
+	} else {
+		db, err = sqlite.Connect(config.DBFile())
+		if err != nil {
+			return fmt.Errorf("Failed to connect to SQLITE database: %w", err)
+		}
 	}
 	defer db.Close()
 

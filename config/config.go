@@ -170,6 +170,84 @@ func DBFile() (f string) {
 	return f
 }
 
+func PostgresHost() (f string) {
+	if c, ok := values["POSTGRES_HOST"]; ok {
+		return c.(string)
+	}
+	defer func() {
+		values["POSTGRES_HOST"] = f
+	}()
+	def := ""
+	f = os.Getenv("POSTGRES_HOST")
+	if f == "" {
+		return def
+	}
+	return f
+}
+
+func PostgresPort() (p int) {
+	if s, ok := values["POSTGRES_PORT"]; ok {
+		return s.(int)
+	}
+	defer func() {
+		values["POSTGRES_PORT"] = p
+	}()
+	def := 5432
+	portStr := os.Getenv("POSTGRES_PORT")
+	if portStr == "" {
+		return def
+	}
+	p, err := strconv.Atoi(portStr)
+	if err != nil || p <= 0 || p > 65535 {
+		log.Fatal("Invalid POSTGRES_PORT value")
+	}
+	return p
+}
+
+func PostgresDB() (f string) {
+	if c, ok := values["POSTGRES_DB"]; ok {
+		return c.(string)
+	}
+	defer func() {
+		values["POSTGRES_DB"] = f
+	}()
+	def := "hid"
+	f = os.Getenv("POSTGRES_DB")
+	if f == "" {
+		return def
+	}
+	return f
+}
+
+func PostgresUser() (f string) {
+	if c, ok := values["POSTGRES_USER"]; ok {
+		return c.(string)
+	}
+	defer func() {
+		values["POSTGRES_USER"] = f
+	}()
+	def := "hid"
+	f = os.Getenv("POSTGRES_USER")
+	if f == "" {
+		return def
+	}
+	return f
+}
+
+func PostgresPassword() (f string) {
+	if c, ok := values["POSTGRES_PASSWORD"]; ok {
+		return c.(string)
+	}
+	defer func() {
+		values["POSTGRES_PASSWORD"] = f
+	}()
+	f = os.Getenv("POSTGRES_PASSWORD")
+	if f == "" {
+		log.Fatal("POSTGRES_PASSWORD must not be empty when providing POSTGRES_HOST")
+	}
+	return f
+}
+
 func SessionLifetime() (d time.Duration) {
 	if a, ok := values["SESSION_LIFETIME"]; ok {
 		return a.(time.Duration)

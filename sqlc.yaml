@@ -2,8 +2,17 @@ version: "2"
 sql:
   - engine: "sqlite"
     queries: "data/sql/sqlite/queries"
-    schema: "data/sql/sqlite/migrations"	
+    schema: "data/sql/sqlite/migrations"
     gen:
       go:
         package: "db"
         out: "repos/sqlite/db"
+  - engine: "postgresql"
+    queries: "data/sql/postgres/queries"
+    schema: "data/sql/postgres/migrations"
+    gen:
+      go:
+        package: "db"
+        out: "repos/postgres/db"
+        sql_package: "pgx/v5"
+        emit_interface: true

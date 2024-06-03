@@ -5,7 +5,7 @@
 package db
 
 import (
-	"database/sql"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Client struct {
@@ -91,8 +91,8 @@ type User struct {
 	PasswordHash    []byte
 	OtpActive       bool
 	OtpUrl          string
-	NewEmail        sql.NullString
+	NewEmail        pgtype.Text
 	NewEmailToken   []byte
-	NewEmailExpires sql.NullInt64
+	NewEmailExpires pgtype.Int8
 	Admin           bool
 }

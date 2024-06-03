@@ -1,36 +1,48 @@
-package sqlite
+package postgres
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	migrate "github.com/rubenv/sql-migrate"
-	"modernc.org/sqlite"
-	sqlite3 "modernc.org/sqlite/lib"
 
 	"github.com/juho05/log"
 
 	hid "github.com/juho05/h-id"
 	"github.com/juho05/h-id/config"
 	"github.com/juho05/h-id/repos"
-	"github.com/juho05/h-id/repos/sqlite/db"
 )
 
 type DB struct {
-	db    *db.Queries
-	rawDB *sql.DB
+	db queryStore
 }
 
-func autoMigrate(db *sql.DB) error {
+func ConstructDSN(dbName, host string, port int, user, password string) string {
+	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", user, password, host, port, dbName)
+}
+
+func autoMigrate(dsn string) error {
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		return fmt.Errorf("auto migrate: %w", err)
+	}
+	defer db.Close()
 	migrations := &migrate.HttpFileSystemMigrationSource{
-		FileSystem: http.FS(hid.SQLiteMigrationsFS),
+		FileSystem: http.FS(hid.PostgresMigrationsFS),
 	}
 	log.Trace("Migrating database...")
-	n, err := migrate.Exec(db, "sqlite3", migrations, migrate.Up)
+	n, err := migrate.Exec(db, "postgres", migrations, migrate.Up)
 	log.Tracef("Applied %d migrations!", n)
 	if err != nil {
 		return err
@@ -38,34 +50,38 @@ func autoMigrate(db *sql.DB) error {
 	return nil
 }
 
-func Connect(filePath string) (repos.DB, error) {
-	log.Tracef("Connecting to SQLite database...")
-	connectionURL := fmt.Sprintf("file:%s?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)", filePath)
-	rawDB, err := sql.Open("sqlite", connectionURL)
+func Connect(dsn string) (repos.DB, error) {
+	log.Tracef("Connecting to Postgres database...")
+	conn, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("connect DB: %w", err)
 	}
-
 	if config.AutoMigrate() {
-		err = autoMigrate(rawDB)
+		err = autoMigrate(dsn)
 		if err != nil {
+			conn.Close()
 			return nil, fmt.Errorf("auto migrate: %w", err)
 		}
 	}
 
+	store, err := NewStore(conn)
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("new store: %w", err)
+	}
+
 	return &DB{
-		db:    db.New(rawDB),
-		rawDB: rawDB,
+		db: store,
 	}, nil
 }
 
 func (d *DB) Close() error {
-	return d.rawDB.Close()
+	return d.db.Close()
 }
 
-func repoErrResult(format string, result sql.Result, err error) error {
+func repoErrResult(format string, result pgconn.CommandTag, err error) error {
 	if err == nil {
-		if rows, err := result.RowsAffected(); err == nil && rows == 0 {
+		if rows := result.RowsAffected(); rows == 0 {
 			return fmt.Errorf(format, repos.ErrNoRecord)
 		}
 		return nil
@@ -77,12 +93,14 @@ func repoErr(format string, err error) error {
 	if err == nil {
 		return nil
 	}
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) {
 		err = repos.ErrNoRecord
 	}
-	var sqliteErr *sqlite.Error
-	if errors.As(err, &sqliteErr) && (sqliteErr.Code() == sqlite3.SQLITE_CONSTRAINT_UNIQUE || sqliteErr.Code() == sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY) {
-		err = repos.ErrExists
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		if pgErr.Code == pgerrcode.UniqueViolation || strings.Contains(pgErr.ConstraintName, "pkey") {
+			err = repos.ErrExists
+		}
 	}
 	return fmt.Errorf(format, err)
 }

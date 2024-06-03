@@ -10,11 +10,12 @@ import (
 )
 
 const commitSession = `-- name: CommitSession :exec
-REPLACE INTO sessions (
+INSERT INTO sessions (
   token, data, expires
 ) VALUES (
-  ?, ?, ?
+  $1, $2, $3
 )
+ON CONFLICT(token) DO UPDATE SET token = $1, data = $2, expires = $3
 `
 
 type CommitSessionParams struct {
@@ -24,21 +25,21 @@ type CommitSessionParams struct {
 }
 
 func (q *Queries) CommitSession(ctx context.Context, arg CommitSessionParams) error {
-	_, err := q.db.ExecContext(ctx, commitSession, arg.Token, arg.Data, arg.Expires)
+	_, err := q.db.Exec(ctx, commitSession, arg.Token, arg.Data, arg.Expires)
 	return err
 }
 
 const deleteSession = `-- name: DeleteSession :exec
-DELETE FROM sessions WHERE token = ?
+DELETE FROM sessions WHERE token = $1
 `
 
 func (q *Queries) DeleteSession(ctx context.Context, token string) error {
-	_, err := q.db.ExecContext(ctx, deleteSession, token)
+	_, err := q.db.Exec(ctx, deleteSession, token)
 	return err
 }
 
 const findSession = `-- name: FindSession :one
-SELECT data FROM sessions WHERE token = ? AND expires > ?2
+SELECT data FROM sessions WHERE token = $1 AND expires > $2
 `
 
 type FindSessionParams struct {
@@ -47,14 +48,14 @@ type FindSessionParams struct {
 }
 
 func (q *Queries) FindSession(ctx context.Context, arg FindSessionParams) ([]byte, error) {
-	row := q.db.QueryRowContext(ctx, findSession, arg.Token, arg.Now)
+	row := q.db.QueryRow(ctx, findSession, arg.Token, arg.Now)
 	var data []byte
 	err := row.Scan(&data)
 	return data, err
 }
 
 const findSessions = `-- name: FindSessions :many
-SELECT token,data FROM sessions WHERE expires > ?1
+SELECT token,data FROM sessions WHERE expires > $1
 `
 
 type FindSessionsRow struct {
@@ -63,7 +64,7 @@ type FindSessionsRow struct {
 }
 
 func (q *Queries) FindSessions(ctx context.Context, now int64) ([]FindSessionsRow, error) {
-	rows, err := q.db.QueryContext(ctx, findSessions, now)
+	rows, err := q.db.Query(ctx, findSessions, now)
 	if err != nil {
 		return nil, err
 	}
@@ -75,9 +76,6 @@ func (q *Queries) FindSessions(ctx context.Context, now int64) ([]FindSessionsRo
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

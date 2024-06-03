@@ -14,7 +14,7 @@ SELECT name, created_at, private, public FROM rsa_keys WHERE name = 'jwt_secret'
 `
 
 func (q *Queries) GetJWTKeys(ctx context.Context) (RsaKey, error) {
-	row := q.db.QueryRowContext(ctx, getJWTKeys)
+	row := q.db.QueryRow(ctx, getJWTKeys)
 	var i RsaKey
 	err := row.Scan(
 		&i.Name,
@@ -29,7 +29,7 @@ const insertJWTKeys = `-- name: InsertJWTKeys :exec
 INSERT INTO rsa_keys (
   name,created_at,private,public
 ) VALUES (
-  'jwt_secret',?,?,?
+  'jwt_secret',$1,$2,$3
 )
 `
 
@@ -40,6 +40,6 @@ type InsertJWTKeysParams struct {
 }
 
 func (q *Queries) InsertJWTKeys(ctx context.Context, arg InsertJWTKeysParams) error {
-	_, err := q.db.ExecContext(ctx, insertJWTKeys, arg.CreatedAt, arg.Private, arg.Public)
+	_, err := q.db.Exec(ctx, insertJWTKeys, arg.CreatedAt, arg.Private, arg.Public)
 	return err
 }

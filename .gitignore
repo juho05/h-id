@@ -7,3 +7,4 @@ gateway.json
 /data/rsa/
 /profile_pictures/
 /bin
+docker-compose.yml

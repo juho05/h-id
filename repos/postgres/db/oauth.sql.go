@@ -7,14 +7,15 @@ package db
 
 import (
 	"context"
-	"database/sql"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 const createOAuthToken = `-- name: CreateOAuthToken :one
 INSERT INTO oauth (
   created_at, category, token_hash, redirect_uri, client_id, user_id, scopes, data, expires, used
 ) VALUES (
-  ?,?,?,?,?,?,?,?,?,?
+  $1,$2,$3,$4,$5,$6,$7,$8,$9,$10
 ) RETURNING created_at, client_id, category, token_hash, redirect_uri, user_id, scopes, data, expires, used
 `
 
@@ -32,7 +33,7 @@ type CreateOAuthTokenParams struct {
 }
 
 func (q *Queries) CreateOAuthToken(ctx context.Context, arg CreateOAuthTokenParams) (Oauth, error) {
-	row := q.db.QueryRowContext(ctx, createOAuthToken,
+	row := q.db.QueryRow(ctx, createOAuthToken,
 		arg.CreatedAt,
 		arg.Category,
 		arg.TokenHash,
@@ -61,7 +62,7 @@ func (q *Queries) CreateOAuthToken(ctx context.Context, arg CreateOAuthTokenPara
 }
 
 const deleteOAuthToken = `-- name: DeleteOAuthToken :execresult
-DELETE FROM oauth WHERE (client_id = ? AND category = ? AND token_hash = ?) OR expires < ?4
+DELETE FROM oauth WHERE (client_id = $1 AND category = $2 AND token_hash = $3) OR expires < $4
 `
 
 type DeleteOAuthTokenParams struct {
@@ -71,8 +72,8 @@ type DeleteOAuthTokenParams struct {
 	Now       int64
 }
 
-func (q *Queries) DeleteOAuthToken(ctx context.Context, arg DeleteOAuthTokenParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, deleteOAuthToken,
+func (q *Queries) DeleteOAuthToken(ctx context.Context, arg DeleteOAuthTokenParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, deleteOAuthToken,
 		arg.ClientID,
 		arg.Category,
 		arg.TokenHash,
@@ -81,7 +82,7 @@ func (q *Queries) DeleteOAuthToken(ctx context.Context, arg DeleteOAuthTokenPara
 }
 
 const deleteOAuthTokenByUser = `-- name: DeleteOAuthTokenByUser :exec
-DELETE FROM oauth WHERE (client_id = ? AND user_id = ?) OR expires < ?3
+DELETE FROM oauth WHERE (client_id = $1 AND user_id = $2) OR expires < $3
 `
 
 type DeleteOAuthTokenByUserParams struct {
@@ -91,12 +92,12 @@ type DeleteOAuthTokenByUserParams struct {
 }
 
 func (q *Queries) DeleteOAuthTokenByUser(ctx context.Context, arg DeleteOAuthTokenByUserParams) error {
-	_, err := q.db.ExecContext(ctx, deleteOAuthTokenByUser, arg.ClientID, arg.UserID, arg.Now)
+	_, err := q.db.Exec(ctx, deleteOAuthTokenByUser, arg.ClientID, arg.UserID, arg.Now)
 	return err
 }
 
 const findOAuthPermissions = `-- name: FindOAuthPermissions :one
-SELECT created_at, client_id, user_id, scopes FROM permissions WHERE client_id = ? AND user_id = ?
+SELECT created_at, client_id, user_id, scopes FROM permissions WHERE client_id = $1 AND user_id = $2
 `
 
 type FindOAuthPermissionsParams struct {
@@ -105,7 +106,7 @@ type FindOAuthPermissionsParams struct {
 }
 
 func (q *Queries) FindOAuthPermissions(ctx context.Context, arg FindOAuthPermissionsParams) (Permission, error) {
-	row := q.db.QueryRowContext(ctx, findOAuthPermissions, arg.ClientID, arg.UserID)
+	row := q.db.QueryRow(ctx, findOAuthPermissions, arg.ClientID, arg.UserID)
 	var i Permission
 	err := row.Scan(
 		&i.CreatedAt,
@@ -117,7 +118,7 @@ func (q *Queries) FindOAuthPermissions(ctx context.Context, arg FindOAuthPermiss
 }
 
 const findOAuthToken = `-- name: FindOAuthToken :one
-SELECT created_at, client_id, category, token_hash, redirect_uri, user_id, scopes, data, expires, used FROM oauth WHERE category = ? AND token_hash = ? AND expires > ?3
+SELECT created_at, client_id, category, token_hash, redirect_uri, user_id, scopes, data, expires, used FROM oauth WHERE category = $1 AND token_hash = $2 AND expires > $3
 `
 
 type FindOAuthTokenParams struct {
@@ -127,7 +128,7 @@ type FindOAuthTokenParams struct {
 }
 
 func (q *Queries) FindOAuthToken(ctx context.Context, arg FindOAuthTokenParams) (Oauth, error) {
-	row := q.db.QueryRowContext(ctx, findOAuthToken, arg.Category, arg.TokenHash, arg.Now)
+	row := q.db.QueryRow(ctx, findOAuthToken, arg.Category, arg.TokenHash, arg.Now)
 	var i Oauth
 	err := row.Scan(
 		&i.CreatedAt,
@@ -145,7 +146,7 @@ func (q *Queries) FindOAuthToken(ctx context.Context, arg FindOAuthTokenParams) 
 }
 
 const revokeOAuthPermissions = `-- name: RevokeOAuthPermissions :execresult
-DELETE FROM permissions WHERE client_id = ? AND user_id = ?
+DELETE FROM permissions WHERE client_id = $1 AND user_id = $2
 `
 
 type RevokeOAuthPermissionsParams struct {
@@ -153,14 +154,15 @@ type RevokeOAuthPermissionsParams struct {
 	UserID   string
 }
 
-func (q *Queries) RevokeOAuthPermissions(ctx context.Context, arg RevokeOAuthPermissionsParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, revokeOAuthPermissions, arg.ClientID, arg.UserID)
+func (q *Queries) RevokeOAuthPermissions(ctx context.Context, arg RevokeOAuthPermissionsParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, revokeOAuthPermissions, arg.ClientID, arg.UserID)
 }
 
 const setOAuthPermissions = `-- name: SetOAuthPermissions :one
-REPLACE INTO permissions (
+INSERT INTO permissions (
   created_at,client_id,user_id,scopes
-) VALUES (?,?,?,?)
+) VALUES ($1,$2,$3,$4)
+ON CONFLICT(client_id,user_id) DO UPDATE SET created_at = $1, client_id = $2, user_id = $3, scopes = $4
 RETURNING created_at, client_id, user_id, scopes
 `
 
@@ -172,7 +174,7 @@ type SetOAuthPermissionsParams struct {
 }
 
 func (q *Queries) SetOAuthPermissions(ctx context.Context, arg SetOAuthPermissionsParams) (Permission, error) {
-	row := q.db.QueryRowContext(ctx, setOAuthPermissions,
+	row := q.db.QueryRow(ctx, setOAuthPermissions,
 		arg.CreatedAt,
 		arg.ClientID,
 		arg.UserID,
@@ -189,7 +191,7 @@ func (q *Queries) SetOAuthPermissions(ctx context.Context, arg SetOAuthPermissio
 }
 
 const useOAuthToken = `-- name: UseOAuthToken :execresult
-UPDATE oauth SET used = TRUE WHERE client_id = ? AND category = ? AND token_hash = ?
+UPDATE oauth SET used = TRUE WHERE client_id = $1 AND category = $2 AND token_hash = $3
 `
 
 type UseOAuthTokenParams struct {
@@ -198,6 +200,6 @@ type UseOAuthTokenParams struct {
 	TokenHash []byte
 }
 
-func (q *Queries) UseOAuthToken(ctx context.Context, arg UseOAuthTokenParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, useOAuthToken, arg.ClientID, arg.Category, arg.TokenHash)
+func (q *Queries) UseOAuthToken(ctx context.Context, arg UseOAuthTokenParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, useOAuthToken, arg.ClientID, arg.Category, arg.TokenHash)
 }

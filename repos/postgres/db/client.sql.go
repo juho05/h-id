@@ -7,14 +7,15 @@ package db
 
 import (
 	"context"
-	"database/sql"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 const createClient = `-- name: CreateClient :one
 INSERT INTO clients (
   id, created_at, name, description, website, redirect_uris, secret_hash, user_id
 ) VALUES (
-  ?, ?, ?, ?, ?, ?, ?, ?  
+  $1, $2, $3, $4, $5, $6, $7, $8
 ) RETURNING id, created_at, name, description, website, redirect_uris, secret_hash, user_id
 `
 
@@ -30,7 +31,7 @@ type CreateClientParams struct {
 }
 
 func (q *Queries) CreateClient(ctx context.Context, arg CreateClientParams) (Client, error) {
-	row := q.db.QueryRowContext(ctx, createClient,
+	row := q.db.QueryRow(ctx, createClient,
 		arg.ID,
 		arg.CreatedAt,
 		arg.Name,
@@ -55,7 +56,7 @@ func (q *Queries) CreateClient(ctx context.Context, arg CreateClientParams) (Cli
 }
 
 const deleteClient = `-- name: DeleteClient :execresult
-DELETE FROM clients WHERE user_id = ? AND id = ?
+DELETE FROM clients WHERE user_id = $1 AND id = $2
 `
 
 type DeleteClientParams struct {
@@ -63,16 +64,16 @@ type DeleteClientParams struct {
 	ID     string
 }
 
-func (q *Queries) DeleteClient(ctx context.Context, arg DeleteClientParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, deleteClient, arg.UserID, arg.ID)
+func (q *Queries) DeleteClient(ctx context.Context, arg DeleteClientParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, deleteClient, arg.UserID, arg.ID)
 }
 
 const findClient = `-- name: FindClient :one
-SELECT id, created_at, name, description, website, redirect_uris, secret_hash, user_id FROM clients WHERE id = ?
+SELECT id, created_at, name, description, website, redirect_uris, secret_hash, user_id FROM clients WHERE id = $1
 `
 
 func (q *Queries) FindClient(ctx context.Context, id string) (Client, error) {
-	row := q.db.QueryRowContext(ctx, findClient, id)
+	row := q.db.QueryRow(ctx, findClient, id)
 	var i Client
 	err := row.Scan(
 		&i.ID,
@@ -88,11 +89,11 @@ func (q *Queries) FindClient(ctx context.Context, id string) (Client, error) {
 }
 
 const findClientByUser = `-- name: FindClientByUser :many
-SELECT id, created_at, name, description, website, redirect_uris, secret_hash, user_id FROM clients WHERE user_id = ?
+SELECT id, created_at, name, description, website, redirect_uris, secret_hash, user_id FROM clients WHERE user_id = $1
 `
 
 func (q *Queries) FindClientByUser(ctx context.Context, userID string) ([]Client, error) {
-	rows, err := q.db.QueryContext(ctx, findClientByUser, userID)
+	rows, err := q.db.Query(ctx, findClientByUser, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -114,9 +115,6 @@ func (q *Queries) FindClientByUser(ctx context.Context, userID string) ([]Client
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -124,7 +122,7 @@ func (q *Queries) FindClientByUser(ctx context.Context, userID string) ([]Client
 }
 
 const findClientByUserAndID = `-- name: FindClientByUserAndID :one
-SELECT id, created_at, name, description, website, redirect_uris, secret_hash, user_id FROM clients WHERE user_id = ? AND id = ?
+SELECT id, created_at, name, description, website, redirect_uris, secret_hash, user_id FROM clients WHERE user_id = $1 AND id = $2
 `
 
 type FindClientByUserAndIDParams struct {
@@ -133,7 +131,7 @@ type FindClientByUserAndIDParams struct {
 }
 
 func (q *Queries) FindClientByUserAndID(ctx context.Context, arg FindClientByUserAndIDParams) (Client, error) {
-	row := q.db.QueryRowContext(ctx, findClientByUserAndID, arg.UserID, arg.ID)
+	row := q.db.QueryRow(ctx, findClientByUserAndID, arg.UserID, arg.ID)
 	var i Client
 	err := row.Scan(
 		&i.ID,
@@ -150,8 +148,8 @@ func (q *Queries) FindClientByUserAndID(ctx context.Context, arg FindClientByUse
 
 const updateClient = `-- name: UpdateClient :one
 UPDATE clients SET
-  name = ?, description = ?, website = ?, redirect_uris = ?
-WHERE user_id = ? AND id = ?
+  name = $1, description = $2, website = $3, redirect_uris = $4
+WHERE user_id = $5 AND id = $6
 RETURNING id, created_at, name, description, website, redirect_uris, secret_hash, user_id
 `
 
@@ -165,7 +163,7 @@ type UpdateClientParams struct {
 }
 
 func (q *Queries) UpdateClient(ctx context.Context, arg UpdateClientParams) (Client, error) {
-	row := q.db.QueryRowContext(ctx, updateClient,
+	row := q.db.QueryRow(ctx, updateClient,
 		arg.Name,
 		arg.Description,
 		arg.Website,
@@ -188,7 +186,7 @@ func (q *Queries) UpdateClient(ctx context.Context, arg UpdateClientParams) (Cli
 }
 
 const updateClientSecret = `-- name: UpdateClientSecret :execresult
-UPDATE clients SET secret_hash = ? WHERE user_id = ? AND id = ?
+UPDATE clients SET secret_hash = $1 WHERE user_id = $2 AND id = $3
 `
 
 type UpdateClientSecretParams struct {
@@ -197,6 +195,6 @@ type UpdateClientSecretParams struct {
 	ID         string
 }
 
-func (q *Queries) UpdateClientSecret(ctx context.Context, arg UpdateClientSecretParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, updateClientSecret, arg.SecretHash, arg.UserID, arg.ID)
+func (q *Queries) UpdateClientSecret(ctx context.Context, arg UpdateClientSecretParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, updateClientSecret, arg.SecretHash, arg.UserID, arg.ID)
 }

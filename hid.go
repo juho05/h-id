@@ -23,6 +23,7 @@ var (
 	StaticFS           fs.FS
 	EmailFS            fs.FS
 	SQLiteMigrationsFS fs.FS
+	PostgresMigrationsFS fs.FS
 )
 
 var OpenIDConfiguration []byte
@@ -45,6 +46,10 @@ func Initialize() {
 		log.Fatal(err)
 	}
 	SQLiteMigrationsFS, err = fs.Sub(dataFS, "data/sql/sqlite/migrations")
+	if err != nil {
+		log.Fatal(err)
+	}
+	PostgresMigrationsFS, err = fs.Sub(dataFS, "data/sql/postgres/migrations")
 	if err != nil {
 		log.Fatal(err)
 	}

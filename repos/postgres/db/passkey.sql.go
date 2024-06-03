@@ -7,14 +7,15 @@ package db
 
 import (
 	"context"
-	"database/sql"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 const createPasskey = `-- name: CreatePasskey :execresult
 INSERT INTO passkeys (
   id, cred_id, name, created_at, user_id, credential
 ) VALUES (
-  ?, ?, ?, ?, ?, ?
+  $1, $2, $3, $4, $5, $6
 )
 `
 
@@ -27,8 +28,8 @@ type CreatePasskeyParams struct {
 	Credential []byte
 }
 
-func (q *Queries) CreatePasskey(ctx context.Context, arg CreatePasskeyParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, createPasskey,
+func (q *Queries) CreatePasskey(ctx context.Context, arg CreatePasskeyParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, createPasskey,
 		arg.ID,
 		arg.CredID,
 		arg.Name,
@@ -39,7 +40,7 @@ func (q *Queries) CreatePasskey(ctx context.Context, arg CreatePasskeyParams) (s
 }
 
 const deletePasskey = `-- name: DeletePasskey :execresult
-DELETE FROM passkeys WHERE user_id = ? AND id = ?
+DELETE FROM passkeys WHERE user_id = $1 AND id = $2
 `
 
 type DeletePasskeyParams struct {
@@ -47,12 +48,12 @@ type DeletePasskeyParams struct {
 	ID     string
 }
 
-func (q *Queries) DeletePasskey(ctx context.Context, arg DeletePasskeyParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, deletePasskey, arg.UserID, arg.ID)
+func (q *Queries) DeletePasskey(ctx context.Context, arg DeletePasskeyParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, deletePasskey, arg.UserID, arg.ID)
 }
 
 const findPasskey = `-- name: FindPasskey :one
-SELECT id, cred_id, name, created_at, user_id, credential FROM passkeys WHERE user_id = ? AND id = ?
+SELECT id, cred_id, name, created_at, user_id, credential FROM passkeys WHERE user_id = $1 AND id = $2
 `
 
 type FindPasskeyParams struct {
@@ -61,7 +62,7 @@ type FindPasskeyParams struct {
 }
 
 func (q *Queries) FindPasskey(ctx context.Context, arg FindPasskeyParams) (Passkey, error) {
-	row := q.db.QueryRowContext(ctx, findPasskey, arg.UserID, arg.ID)
+	row := q.db.QueryRow(ctx, findPasskey, arg.UserID, arg.ID)
 	var i Passkey
 	err := row.Scan(
 		&i.ID,
@@ -75,11 +76,11 @@ func (q *Queries) FindPasskey(ctx context.Context, arg FindPasskeyParams) (Passk
 }
 
 const findPasskeys = `-- name: FindPasskeys :many
-SELECT id, cred_id, name, created_at, user_id, credential FROM passkeys WHERE user_id = ?
+SELECT id, cred_id, name, created_at, user_id, credential FROM passkeys WHERE user_id = $1
 `
 
 func (q *Queries) FindPasskeys(ctx context.Context, userID string) ([]Passkey, error) {
-	rows, err := q.db.QueryContext(ctx, findPasskeys, userID)
+	rows, err := q.db.Query(ctx, findPasskeys, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -99,9 +100,6 @@ func (q *Queries) FindPasskeys(ctx context.Context, userID string) ([]Passkey, e
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -109,7 +107,7 @@ func (q *Queries) FindPasskeys(ctx context.Context, userID string) ([]Passkey, e
 }
 
 const updatePasskey = `-- name: UpdatePasskey :execresult
-UPDATE passkeys SET name = ? WHERE user_id = ? AND id = ?
+UPDATE passkeys SET name = $1 WHERE user_id = $2 AND id = $3
 `
 
 type UpdatePasskeyParams struct {
@@ -118,12 +116,12 @@ type UpdatePasskeyParams struct {
 	ID     string
 }
 
-func (q *Queries) UpdatePasskey(ctx context.Context, arg UpdatePasskeyParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, updatePasskey, arg.Name, arg.UserID, arg.ID)
+func (q *Queries) UpdatePasskey(ctx context.Context, arg UpdatePasskeyParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, updatePasskey, arg.Name, arg.UserID, arg.ID)
 }
 
 const updatePasskeyCredential = `-- name: UpdatePasskeyCredential :execresult
-UPDATE passkeys SET credential = ? WHERE user_id = ? AND cred_id = ?
+UPDATE passkeys SET credential = $1 WHERE user_id = $2 AND cred_id = $3
 `
 
 type UpdatePasskeyCredentialParams struct {
@@ -132,6 +130,6 @@ type UpdatePasskeyCredentialParams struct {
 	CredID     []byte
 }
 
-func (q *Queries) UpdatePasskeyCredential(ctx context.Context, arg UpdatePasskeyCredentialParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, updatePasskeyCredential, arg.Credential, arg.UserID, arg.CredID)
+func (q *Queries) UpdatePasskeyCredential(ctx context.Context, arg UpdatePasskeyCredentialParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, updatePasskeyCredential, arg.Credential, arg.UserID, arg.CredID)
 }

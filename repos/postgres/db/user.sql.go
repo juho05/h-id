@@ -7,33 +7,35 @@ package db
 
 import (
 	"context"
-	"database/sql"
+
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const countRecoveryCodes = `-- name: CountRecoveryCodes :one
-SELECT COUNT(code_hash) FROM recovery_codes WHERE user_id = ?
+SELECT COUNT(code_hash) FROM recovery_codes WHERE user_id = $1
 `
 
 func (q *Queries) CountRecoveryCodes(ctx context.Context, userID string) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countRecoveryCodes, userID)
+	row := q.db.QueryRow(ctx, countRecoveryCodes, userID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
 }
 
 const createChangeEmailRequest = `-- name: CreateChangeEmailRequest :execresult
-UPDATE users SET new_email = ?, new_email_token = ?, new_email_expires = ? WHERE id = ?
+UPDATE users SET new_email = $1, new_email_token = $2, new_email_expires = $3 WHERE id = $4
 `
 
 type CreateChangeEmailRequestParams struct {
-	NewEmail        sql.NullString
+	NewEmail        pgtype.Text
 	NewEmailToken   []byte
-	NewEmailExpires sql.NullInt64
+	NewEmailExpires pgtype.Int8
 	ID              string
 }
 
-func (q *Queries) CreateChangeEmailRequest(ctx context.Context, arg CreateChangeEmailRequestParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, createChangeEmailRequest,
+func (q *Queries) CreateChangeEmailRequest(ctx context.Context, arg CreateChangeEmailRequestParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, createChangeEmailRequest,
 		arg.NewEmail,
 		arg.NewEmailToken,
 		arg.NewEmailExpires,
@@ -42,7 +44,7 @@ func (q *Queries) CreateChangeEmailRequest(ctx context.Context, arg CreateChange
 }
 
 const createRecoveryCode = `-- name: CreateRecoveryCode :exec
-INSERT INTO recovery_codes (created_at,user_id,code_hash) VALUES (?,?,?)
+INSERT INTO recovery_codes (created_at,user_id,code_hash) VALUES ($1,$2,$3)
 `
 
 type CreateRecoveryCodeParams struct {
@@ -52,7 +54,7 @@ type CreateRecoveryCodeParams struct {
 }
 
 func (q *Queries) CreateRecoveryCode(ctx context.Context, arg CreateRecoveryCodeParams) error {
-	_, err := q.db.ExecContext(ctx, createRecoveryCode, arg.CreatedAt, arg.UserID, arg.CodeHash)
+	_, err := q.db.Exec(ctx, createRecoveryCode, arg.CreatedAt, arg.UserID, arg.CodeHash)
 	return err
 }
 
@@ -60,7 +62,7 @@ const createUser = `-- name: CreateUser :one
 INSERT INTO users (
   id, created_at, name, email, email_confirmed, password_hash, otp_active, otp_url
 ) VALUES (
-  ?, ?, ?, ?, ?, ?, ?, ?
+  $1, $2, $3, $4, $5, $6, $7, $8
 ) RETURNING id, created_at, name, email, email_confirmed, password_hash, otp_active, otp_url, new_email, new_email_token, new_email_expires, admin
 `
 
@@ -76,7 +78,7 @@ type CreateUserParams struct {
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, createUser,
+	row := q.db.QueryRow(ctx, createUser,
 		arg.ID,
 		arg.CreatedAt,
 		arg.Name,
@@ -105,7 +107,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 }
 
 const deleteRecoveryCode = `-- name: DeleteRecoveryCode :execresult
-DELETE FROM recovery_codes WHERE user_id = ? AND code_hash = ?
+DELETE FROM recovery_codes WHERE user_id = $1 AND code_hash = $2
 `
 
 type DeleteRecoveryCodeParams struct {
@@ -113,32 +115,32 @@ type DeleteRecoveryCodeParams struct {
 	CodeHash []byte
 }
 
-func (q *Queries) DeleteRecoveryCode(ctx context.Context, arg DeleteRecoveryCodeParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, deleteRecoveryCode, arg.UserID, arg.CodeHash)
+func (q *Queries) DeleteRecoveryCode(ctx context.Context, arg DeleteRecoveryCodeParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, deleteRecoveryCode, arg.UserID, arg.CodeHash)
 }
 
 const deleteRecoveryCodes = `-- name: DeleteRecoveryCodes :execresult
-DELETE FROM recovery_codes WHERE user_id = ?
+DELETE FROM recovery_codes WHERE user_id = $1
 `
 
-func (q *Queries) DeleteRecoveryCodes(ctx context.Context, userID string) (sql.Result, error) {
-	return q.db.ExecContext(ctx, deleteRecoveryCodes, userID)
+func (q *Queries) DeleteRecoveryCodes(ctx context.Context, userID string) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, deleteRecoveryCodes, userID)
 }
 
 const deleteUser = `-- name: DeleteUser :execresult
-DELETE FROM users WHERE id = ?
+DELETE FROM users WHERE id = $1
 `
 
-func (q *Queries) DeleteUser(ctx context.Context, id string) (sql.Result, error) {
-	return q.db.ExecContext(ctx, deleteUser, id)
+func (q *Queries) DeleteUser(ctx context.Context, id string) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, deleteUser, id)
 }
 
 const findUser = `-- name: FindUser :one
-SELECT id, created_at, name, email, email_confirmed, password_hash, otp_active, otp_url, new_email, new_email_token, new_email_expires, admin FROM users WHERE id = ?
+SELECT id, created_at, name, email, email_confirmed, password_hash, otp_active, otp_url, new_email, new_email_token, new_email_expires, admin FROM users WHERE id = $1
 `
 
 func (q *Queries) FindUser(ctx context.Context, id string) (User, error) {
-	row := q.db.QueryRowContext(ctx, findUser, id)
+	row := q.db.QueryRow(ctx, findUser, id)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -158,16 +160,16 @@ func (q *Queries) FindUser(ctx context.Context, id string) (User, error) {
 }
 
 const findUserByChangeEmailToken = `-- name: FindUserByChangeEmailToken :one
-SELECT id, created_at, name, email, email_confirmed, password_hash, otp_active, otp_url, new_email, new_email_token, new_email_expires, admin FROM users WHERE new_email_token = ? AND new_email_expires > ?2
+SELECT id, created_at, name, email, email_confirmed, password_hash, otp_active, otp_url, new_email, new_email_token, new_email_expires, admin FROM users WHERE new_email_token = $1 AND new_email_expires > $2
 `
 
 type FindUserByChangeEmailTokenParams struct {
 	NewEmailToken []byte
-	Now           sql.NullInt64
+	Now           pgtype.Int8
 }
 
 func (q *Queries) FindUserByChangeEmailToken(ctx context.Context, arg FindUserByChangeEmailTokenParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, findUserByChangeEmailToken, arg.NewEmailToken, arg.Now)
+	row := q.db.QueryRow(ctx, findUserByChangeEmailToken, arg.NewEmailToken, arg.Now)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -187,11 +189,11 @@ func (q *Queries) FindUserByChangeEmailToken(ctx context.Context, arg FindUserBy
 }
 
 const findUserByEmail = `-- name: FindUserByEmail :one
-SELECT id, created_at, name, email, email_confirmed, password_hash, otp_active, otp_url, new_email, new_email_token, new_email_expires, admin FROM users WHERE email = ?
+SELECT id, created_at, name, email, email_confirmed, password_hash, otp_active, otp_url, new_email, new_email_token, new_email_expires, admin FROM users WHERE email = $1
 `
 
 func (q *Queries) FindUserByEmail(ctx context.Context, email string) (User, error) {
-	row := q.db.QueryRowContext(ctx, findUserByEmail, email)
+	row := q.db.QueryRow(ctx, findUserByEmail, email)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -215,7 +217,7 @@ SELECT id, created_at, name, email, email_confirmed, password_hash, otp_active, 
 `
 
 func (q *Queries) FindUsers(ctx context.Context) ([]User, error) {
-	rows, err := q.db.QueryContext(ctx, findUsers)
+	rows, err := q.db.Query(ctx, findUsers)
 	if err != nil {
 		return nil, err
 	}
@@ -241,9 +243,6 @@ func (q *Queries) FindUsers(ctx context.Context) ([]User, error) {
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -251,7 +250,7 @@ func (q *Queries) FindUsers(ctx context.Context) ([]User, error) {
 }
 
 const getOTP = `-- name: GetOTP :one
-SELECT otp_active,otp_url FROM users WHERE id = ?
+SELECT otp_active,otp_url FROM users WHERE id = $1
 `
 
 type GetOTPRow struct {
@@ -260,25 +259,25 @@ type GetOTPRow struct {
 }
 
 func (q *Queries) GetOTP(ctx context.Context, id string) (GetOTPRow, error) {
-	row := q.db.QueryRowContext(ctx, getOTP, id)
+	row := q.db.QueryRow(ctx, getOTP, id)
 	var i GetOTPRow
 	err := row.Scan(&i.OtpActive, &i.OtpUrl)
 	return i, err
 }
 
 const getUserPasswordHash = `-- name: GetUserPasswordHash :one
-SELECT password_hash FROM users WHERE id = ?
+SELECT password_hash FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserPasswordHash(ctx context.Context, id string) ([]byte, error) {
-	row := q.db.QueryRowContext(ctx, getUserPasswordHash, id)
+	row := q.db.QueryRow(ctx, getUserPasswordHash, id)
 	var password_hash []byte
 	err := row.Scan(&password_hash)
 	return password_hash, err
 }
 
 const setOTPActive = `-- name: SetOTPActive :execresult
-UPDATE users SET otp_active = ? WHERE id = ?
+UPDATE users SET otp_active = $1 WHERE id = $2
 `
 
 type SetOTPActiveParams struct {
@@ -286,12 +285,12 @@ type SetOTPActiveParams struct {
 	ID        string
 }
 
-func (q *Queries) SetOTPActive(ctx context.Context, arg SetOTPActiveParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, setOTPActive, arg.OtpActive, arg.ID)
+func (q *Queries) SetOTPActive(ctx context.Context, arg SetOTPActiveParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, setOTPActive, arg.OtpActive, arg.ID)
 }
 
 const updateAdminStatus = `-- name: UpdateAdminStatus :execresult
-UPDATE users SET admin = ? WHERE id = ?
+UPDATE users SET admin = $1 WHERE id = $2
 `
 
 type UpdateAdminStatusParams struct {
@@ -299,28 +298,28 @@ type UpdateAdminStatusParams struct {
 	ID    string
 }
 
-func (q *Queries) UpdateAdminStatus(ctx context.Context, arg UpdateAdminStatusParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, updateAdminStatus, arg.Admin, arg.ID)
+func (q *Queries) UpdateAdminStatus(ctx context.Context, arg UpdateAdminStatusParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, updateAdminStatus, arg.Admin, arg.ID)
 }
 
 const updateEmail = `-- name: UpdateEmail :one
-UPDATE users SET email = new_email, new_email = NULL, new_email_token = NULL, new_email_expires = NULL WHERE new_email_token = ? AND new_email_expires > ?2 RETURNING email
+UPDATE users SET email = new_email, new_email = NULL, new_email_token = NULL, new_email_expires = NULL WHERE new_email_token = $1 AND new_email_expires > $2 RETURNING email
 `
 
 type UpdateEmailParams struct {
 	NewEmailToken []byte
-	Now           sql.NullInt64
+	Now           pgtype.Int8
 }
 
 func (q *Queries) UpdateEmail(ctx context.Context, arg UpdateEmailParams) (string, error) {
-	row := q.db.QueryRowContext(ctx, updateEmail, arg.NewEmailToken, arg.Now)
+	row := q.db.QueryRow(ctx, updateEmail, arg.NewEmailToken, arg.Now)
 	var email string
 	err := row.Scan(&email)
 	return email, err
 }
 
 const updateEmailConfirmed = `-- name: UpdateEmailConfirmed :execresult
-UPDATE users SET email_confirmed = ? WHERE id = ?
+UPDATE users SET email_confirmed = $1 WHERE id = $2
 `
 
 type UpdateEmailConfirmedParams struct {
@@ -328,12 +327,12 @@ type UpdateEmailConfirmedParams struct {
 	ID             string
 }
 
-func (q *Queries) UpdateEmailConfirmed(ctx context.Context, arg UpdateEmailConfirmedParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, updateEmailConfirmed, arg.EmailConfirmed, arg.ID)
+func (q *Queries) UpdateEmailConfirmed(ctx context.Context, arg UpdateEmailConfirmedParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, updateEmailConfirmed, arg.EmailConfirmed, arg.ID)
 }
 
 const updateOTP = `-- name: UpdateOTP :execresult
-UPDATE users SET otp_active = ?, otp_url = ? WHERE id = ?
+UPDATE users SET otp_active = $1, otp_url = $2 WHERE id = $3
 `
 
 type UpdateOTPParams struct {
@@ -342,12 +341,12 @@ type UpdateOTPParams struct {
 	ID        string
 }
 
-func (q *Queries) UpdateOTP(ctx context.Context, arg UpdateOTPParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, updateOTP, arg.OtpActive, arg.OtpUrl, arg.ID)
+func (q *Queries) UpdateOTP(ctx context.Context, arg UpdateOTPParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, updateOTP, arg.OtpActive, arg.OtpUrl, arg.ID)
 }
 
 const updatePassword = `-- name: UpdatePassword :execresult
-UPDATE users SET password_hash = ? WHERE id = ?
+UPDATE users SET password_hash = $1 WHERE id = $2
 `
 
 type UpdatePasswordParams struct {
@@ -355,12 +354,12 @@ type UpdatePasswordParams struct {
 	ID           string
 }
 
-func (q *Queries) UpdatePassword(ctx context.Context, arg UpdatePasswordParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, updatePassword, arg.PasswordHash, arg.ID)
+func (q *Queries) UpdatePassword(ctx context.Context, arg UpdatePasswordParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, updatePassword, arg.PasswordHash, arg.ID)
 }
 
 const updateUserName = `-- name: UpdateUserName :execresult
-UPDATE users SET name = ? WHERE id = ?
+UPDATE users SET name = $1 WHERE id = $2
 `
 
 type UpdateUserNameParams struct {
@@ -368,6 +367,6 @@ type UpdateUserNameParams struct {
 	ID   string
 }
 
-func (q *Queries) UpdateUserName(ctx context.Context, arg UpdateUserNameParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, updateUserName, arg.Name, arg.ID)
+func (q *Queries) UpdateUserName(ctx context.Context, arg UpdateUserNameParams) (pgconn.CommandTag, error) {
+	return q.db.Exec(ctx, updateUserName, arg.Name, arg.ID)
 }
