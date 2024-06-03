@@ -2,10 +2,10 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/juho05/h-id/repos"
 	"github.com/juho05/h-id/repos/postgres/db"
 )
@@ -46,7 +46,7 @@ func (s *sessionRepository) FindCtx(ctx context.Context, token string) ([]byte, 
 		Now:   time.Now().Unix(),
 	})
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, false, nil
 		}
 		return nil, false, err

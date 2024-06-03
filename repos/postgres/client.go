@@ -2,11 +2,11 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"net/url"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/oklog/ulid/v2"
 
 	"github.com/juho05/h-id/repos"
@@ -88,7 +88,7 @@ func (c *clientRepository) FindByUserAndID(ctx context.Context, userID, id ulid.
 func (c *clientRepository) FindByUser(ctx context.Context, userID ulid.ULID) ([]*repos.ClientModel, error) {
 	clients, err := c.db.FindClientByUser(ctx, userID.String())
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return make([]*repos.ClientModel, 0), nil
 		}
 		return nil, repoErr("find client by user: %w", err)

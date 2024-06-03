@@ -2,13 +2,13 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/oklog/ulid/v2"
@@ -134,7 +134,7 @@ func (u *userRepository) FindByChangeEmailToken(ctx context.Context, tokenHash [
 func (u *userRepository) GetPasswordHash(ctx context.Context, userID ulid.ULID) ([]byte, error) {
 	hash, err := u.db.GetUserPasswordHash(ctx, userID.String())
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			err = repos.ErrNoRecord
 		}
 		return nil, fmt.Errorf("get password hash: %w", err)
@@ -145,7 +145,7 @@ func (u *userRepository) GetPasswordHash(ctx context.Context, userID ulid.ULID) 
 func (u *userRepository) GetOTP(ctx context.Context, userID ulid.ULID) (active bool, key *otp.Key, err error) {
 	res, err := u.db.GetOTP(ctx, userID.String())
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			err = repos.ErrNoRecord
 		}
 		return false, nil, fmt.Errorf("get otp: %w", err)
