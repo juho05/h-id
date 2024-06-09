@@ -113,7 +113,9 @@ services:
       - ./gateway.json:/gateway.json:ro
 ```
 
-Access rules can be configuraed in `./gateway.json`, e.g.:
+Additionally, it's recommended to use Postgres as the database backend to prevent locking errors.
+
+Access rules can be configured in `./gateway.json`, e.g.:
 ```json
 {
   "users": {
@@ -181,6 +183,11 @@ my-service.example.com {
 | LOG_APPEND           | `true`/`false`                                               | `false`                                                    | Whether to append logs to an existing file or replace the file on start                                                        |
 | BCRYPT_COST          | >0                                                           | `12`                                                       | The bcrypt cost to use for password hashing (larger values are more secure but lead to longer login times)                     |
 | DB_FILE              | filepath, e.g. `./h-id.db`                                   | `/database.sqlite` (Docker), `database.sqlite` (otherwise) | Where the database file is located. The database is created if it does not already exist.                                      |
+| POSTGRES_HOST        | e.g. `localhost`, `127.0.0.1`                                | *empty*                                                    | The host where the Postgres database is located. Enables Postgres database backend                                             |
+| POSTGRES_PORT        | 1-65535                                                      | 5432                                                       | The port of the Postgres database                                                                                              |
+| POSTGRES_DB          | *string*                                                     | `hid`                                                      | The name of the Postgres database                                                                                              |
+| POSTGRES_USER        | *string*                                                     | `hid`                                                      | The user to use when connecting to Postgres                                                                                    |
+| POSTGRES_PASSWORD    | *string*                                                     | *empty*                                                    | (**required** when `POSTGRES_HOST` is set) The password of *$POSTGRES_USER*                                                    |
 | SESSION_LIFETIME     | `24h`,`60m`,`3h5m3s`                                         | `72h`                                                      | The lifetime of user sessions. I recommend short values when H-ID is not used as an auth gateway.                              |
 | SESSION_IDLE_TIMEOUT | `24h`,`64m`,`3h5m3s`                                         | `24h`                                                      | The time after which users without activity are signed out. I recommend short values when H-ID is not used as an auth gateway. |
 | AUTH_GATEWAY_CONFIG  | filepath, e.g. `./gateway.json`                              | *empty*                                                    | The location of the auth gateway config file. Empty file -> access always denied                                               |
