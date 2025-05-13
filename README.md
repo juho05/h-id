@@ -2,7 +2,11 @@
 
 ## Description
 
-H-ID is an [OpenID Connect](https://openid.net/connect/) identity provider and auth gateway. It can act as a singe sign-on provider and/or as an auth gateway similar to [Authelia](https://www.authelia.com/).
+H-ID is an [OpenID Connect](https://openid.net/connect/) identity provider and forward authentication gateway.
+
+### Security
+
+This is a hobby project. **There are _ABSOLUTELY NO_ security guarantees!**
 
 ### Features
 
@@ -256,7 +260,7 @@ make clean
 
 ## License
 
-Copyright (c) 2023-2024 Julian Hofmann
+Copyright (c) 2023-2025 Julian Hofmann
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published
