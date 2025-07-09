@@ -25,7 +25,7 @@
       {{with .FieldErrors.Password}}<label class="error-label" for="password">{{.}}</label>{{end}}
 
       <a class="input-label" href="/user/forgotPassword">{{translate .Lang "forgotPasswordLink"}}</a>
-      <a class="input-label" href="/user/signup">{{translate .Lang "createAccount"}}</a>
+      {{if not .InviteOnly}}<a class="input-label" href="/user/signup">{{translate .Lang "createAccount"}}</a>{{end}}
     </div>
     <div class="submit-div">
       <input class="btn" type="submit" value="{{translate .Lang "login"}}">

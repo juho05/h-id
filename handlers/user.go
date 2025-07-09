@@ -81,6 +81,13 @@ func (h *Handler) userRoutes(r chi.Router) {
 }
 
 func (h *Handler) userSignUpPage(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	inviteToken := query.Get("invitation")
+	if config.InviteOnly() && inviteToken == "" {
+		http.Redirect(w, r, "/user/login", http.StatusTemporaryRedirect)
+		return
+	}
+
 	type data struct {
 		LoginRedirect string
 	}
@@ -93,7 +100,6 @@ func (h *Handler) userSignUpPage(w http.ResponseWriter, r *http.Request) {
 	if config.HCaptchaSiteKey() != "" {
 		w.Header().Set("Cross-Origin-Embedder-Policy", "unsafe-none")
 	}
-	query := r.URL.Query()
 	type form struct {
 		Name        string
 		Email       string
@@ -101,7 +107,7 @@ func (h *Handler) userSignUpPage(w http.ResponseWriter, r *http.Request) {
 	}
 	tmplData.Form = form{
 		Email:       query.Get("email"),
-		InviteToken: query.Get("invitation"),
+		InviteToken: inviteToken,
 	}
 	h.Renderer.render(w, r, http.StatusOK, "signup", tmplData)
 }
@@ -129,19 +135,17 @@ func (h *Handler) userSignUp(w http.ResponseWriter, r *http.Request) {
 	body.Email = strings.TrimSpace(body.Email)
 
 	lang := services.GetLanguageFromAcceptLanguageHeader(strings.Join(r.Header["Accept-Language"], ","))
-	if body.InviteToken != "" || config.InviteOnly() {
+	if config.InviteOnly() {
 		err := h.AuthService.VerifyInvitationToken(r.Context(), body.Email, body.InviteToken)
 		if err != nil {
 			if !errors.Is(err, services.ErrInvalidCredentials) {
 				serverError(w, err)
 				return
 			}
-			if config.InviteOnly() {
-				data.Form = body
-				data.Errors = append(data.Errors, services.MustTranslate(lang, "inviteOnlyInvalidToken"))
-				h.Renderer.render(w, r, http.StatusUnprocessableEntity, "signup", data)
-				return
-			}
+			data.Form = body
+			data.Errors = append(data.Errors, services.MustTranslate(lang, "inviteOnlyInvalidToken"))
+			h.Renderer.render(w, r, http.StatusUnprocessableEntity, "signup", data)
+			return
 		}
 	}
 
