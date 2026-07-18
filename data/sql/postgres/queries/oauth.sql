@@ -7,7 +7,7 @@ INSERT INTO oauth (
 -- name: FindOAuthToken :one
 SELECT * FROM oauth WHERE category = $1 AND token_hash = $2 AND expires > sqlc.arg(now);
 -- name: UseOAuthToken :execresult
-UPDATE oauth SET used = TRUE WHERE client_id = $1 AND category = $2 AND token_hash = $3;
+UPDATE oauth SET used = TRUE WHERE client_id = $1 AND category = $2 AND token_hash = $3 AND used = FALSE;
 -- name: DeleteOAuthToken :execresult
 DELETE FROM oauth WHERE (client_id = $1 AND category = $2 AND token_hash = $3) OR expires < sqlc.arg(now);
 -- name: DeleteOAuthTokenByUser :exec

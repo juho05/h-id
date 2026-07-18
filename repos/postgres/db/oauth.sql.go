@@ -195,7 +195,7 @@ func (q *Queries) SetOAuthPermissions(ctx context.Context, arg SetOAuthPermissio
 }
 
 const useOAuthToken = `-- name: UseOAuthToken :execresult
-UPDATE oauth SET used = TRUE WHERE client_id = $1 AND category = $2 AND token_hash = $3
+UPDATE oauth SET used = TRUE WHERE client_id = $1 AND category = $2 AND token_hash = $3 AND used = FALSE
 `
 
 type UseOAuthTokenParams struct {

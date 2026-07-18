@@ -363,6 +363,12 @@ func (a *authService) OAuthGenerateTokens(ctx context.Context, clientID ulid.ULI
 
 	err = a.oauthRepo.Use(ctx, clientID, tokenType, token.TokenHash)
 	if err != nil {
+		if errors.Is(err, repos.ErrNoRecord) {
+			if revokeErr := a.RevokeOAuthTokens(ctx, clientID, token.UserID); revokeErr != nil {
+				log.Errorf("%s\n%s", fmt.Sprintf("oauth generate tokens: %s", revokeErr), debug.Stack())
+			}
+			return "", "", "", nil, 0, ErrReusedToken
+		}
 		return "", "", "", nil, 0, fmt.Errorf("oauth generate tokens: %w", err)
 	}
 
