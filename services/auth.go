@@ -38,6 +38,8 @@ import (
 	"github.com/juho05/h-id/repos"
 )
 
+const accessTokenLifetime = 30 * time.Minute
+
 type AuthService interface {
 	PublicJWTKey() *rsa.PublicKey
 
@@ -82,7 +84,7 @@ type AuthService interface {
 	StartOAuthCodeFlow(ctx context.Context, clientID ulid.ULID, redirectURI *url.URL, responseType, scope, state, nonce, codeChallenge, codeChallengeMethod string) error
 	GetAuthRequest(ctx context.Context) (AuthRequest, error)
 	OAuthConsent(ctx context.Context) (string, error)
-	OAuthGenerateTokens(ctx context.Context, clientID ulid.ULID, clientSecret string, redirectURI *url.URL, grantType, grant, codeVerifier string) (access string, refresh string, id string, err error)
+	OAuthGenerateTokens(ctx context.Context, clientID ulid.ULID, clientSecret string, redirectURI *url.URL, grantType, grant, codeVerifier, scope string) (access string, refresh string, id string, scopes []string, expiresIn time.Duration, err error)
 	VerifyClientCredentials(ctx context.Context, clientID ulid.ULID, clientSecret string) error
 	RevokeOAuthTokens(ctx context.Context, clientID, userID ulid.ULID) error
 
@@ -299,9 +301,9 @@ func (a *authService) OAuthConsent(ctx context.Context) (string, error) {
 	return code, nil
 }
 
-func (a *authService) OAuthGenerateTokens(ctx context.Context, clientID ulid.ULID, clientSecret string, redirectURI *url.URL, grantType, grant, codeVerifier string) (string, string, string, error) {
+func (a *authService) OAuthGenerateTokens(ctx context.Context, clientID ulid.ULID, clientSecret string, redirectURI *url.URL, grantType, grant, codeVerifier, scope string) (string, string, string, []string, time.Duration, error) {
 	if err := a.VerifyClientCredentials(ctx, clientID, clientSecret); err != nil {
-		return "", "", "", fmt.Errorf("oauth generate tokens: %w", err)
+		return "", "", "", nil, 0, fmt.Errorf("oauth generate tokens: %w", err)
 	}
 
 	var hash []byte
@@ -314,7 +316,7 @@ func (a *authService) OAuthGenerateTokens(ctx context.Context, clientID ulid.ULI
 		hash = hashTokenWeak(grant)
 		tokenType = repos.OAuthTokenRefresh
 	default:
-		return "", "", "", ErrUnsupportedGrantType
+		return "", "", "", nil, 0, ErrUnsupportedGrantType
 	}
 
 	token, err := a.oauthRepo.Find(ctx, tokenType, hash)
@@ -322,36 +324,46 @@ func (a *authService) OAuthGenerateTokens(ctx context.Context, clientID ulid.ULI
 		if errors.Is(err, repos.ErrNoRecord) {
 			err = ErrInvalidGrant
 		}
-		return "", "", "", fmt.Errorf("oauth generate tokens: %w", err)
+		return "", "", "", nil, 0, fmt.Errorf("oauth generate tokens: %w", err)
 	}
 	if token.ClientID != clientID {
-		return "", "", "", fmt.Errorf("oauth generate tokens: %w", ErrInvalidGrant)
+		return "", "", "", nil, 0, fmt.Errorf("oauth generate tokens: %w", ErrInvalidGrant)
 	}
 	if token.Used {
 		err = a.RevokeOAuthTokens(ctx, clientID, token.UserID)
 		if err != nil {
 			log.Errorf("%s\n%s", fmt.Sprintf("oauth generate tokens: %s", err), debug.Stack())
 		}
-		return "", "", "", ErrReusedToken
+		return "", "", "", nil, 0, ErrReusedToken
 	}
 
 	if grantType != "refresh_token" && token.RedirectURI.String() != redirectURI.String() {
-		return "", "", "", fmt.Errorf("oauth generate tokens: %w", ErrInvalidRedirectURI)
+		return "", "", "", nil, 0, fmt.Errorf("oauth generate tokens: %w", ErrInvalidRedirectURI)
 	}
 
 	if grantType == "authorization_code" {
 		if token.CodeChallenge != "" {
 			if codeVerifier == "" || !verifyCodeChallenge(codeVerifier, token.CodeChallenge) {
-				return "", "", "", fmt.Errorf("oauth generate tokens: %w", ErrInvalidGrant)
+				return "", "", "", nil, 0, fmt.Errorf("oauth generate tokens: %w", ErrInvalidGrant)
 			}
 		} else if codeVerifier != "" {
-			return "", "", "", fmt.Errorf("oauth generate tokens: %w", ErrInvalidGrant)
+			return "", "", "", nil, 0, fmt.Errorf("oauth generate tokens: %w", ErrInvalidGrant)
+		}
+	}
+
+	scopes := token.Scopes
+	if grantType == "refresh_token" && strings.TrimSpace(scope) != "" {
+		scopes = strings.Split(scope, " ")
+		for _, s := range scopes {
+			if !slices.Contains(token.Scopes, s) {
+				return "", "", "", nil, 0, fmt.Errorf("oauth generate tokens: %w: %s", ErrInvalidScope, s)
+			}
 		}
 	}
 
 	err = a.oauthRepo.Use(ctx, clientID, tokenType, token.TokenHash)
 	if err != nil {
-		return "", "", "", fmt.Errorf("oauth generate tokens: %w", err)
+		return "", "", "", nil, 0, fmt.Errorf("oauth generate tokens: %w", err)
 	}
 
 	access := GenerateToken(64)
@@ -359,14 +371,14 @@ func (a *authService) OAuthGenerateTokens(ctx context.Context, clientID ulid.ULI
 	refresh := GenerateToken(128)
 	refreshHash := hashTokenWeak(refresh)
 
-	_, err = a.oauthRepo.Create(ctx, token.ClientID, token.UserID, repos.OAuthTokenAccess, accessHash, nil, token.Scopes, nil, "", 30*time.Minute)
+	_, err = a.oauthRepo.Create(ctx, token.ClientID, token.UserID, repos.OAuthTokenAccess, accessHash, nil, scopes, nil, "", accessTokenLifetime)
 	if err != nil {
-		return "", "", "", fmt.Errorf("oauth tokens by code: %w", err)
+		return "", "", "", nil, 0, fmt.Errorf("oauth tokens by code: %w", err)
 	}
 
-	_, err = a.oauthRepo.Create(ctx, token.ClientID, token.UserID, repos.OAuthTokenRefresh, refreshHash, nil, token.Scopes, nil, "", 12*7*24*time.Hour)
+	_, err = a.oauthRepo.Create(ctx, token.ClientID, token.UserID, repos.OAuthTokenRefresh, refreshHash, nil, scopes, nil, "", 12*7*24*time.Hour)
 	if err != nil {
-		return "", "", "", fmt.Errorf("oauth tokens by code: %w", err)
+		return "", "", "", nil, 0, fmt.Errorf("oauth tokens by code: %w", err)
 	}
 
 	var nonce string
@@ -375,14 +387,14 @@ func (a *authService) OAuthGenerateTokens(ctx context.Context, clientID ulid.ULI
 	}
 
 	var id string
-	if slices.Contains(token.Scopes, "openid") {
+	if slices.Contains(scopes, "openid") {
 		id, err = a.createIDToken(token.ClientID, token.UserID, nonce, access)
 		if err != nil {
-			return "", "", "", fmt.Errorf("oauth tokens by code: %w", err)
+			return "", "", "", nil, 0, fmt.Errorf("oauth tokens by code: %w", err)
 		}
 	}
 
-	return access, refresh, id, nil
+	return access, refresh, id, scopes, accessTokenLifetime, nil
 }
 
 func (a *authService) createIDToken(clientID, userID ulid.ULID, nonce, accessToken string) (string, error) {
@@ -396,7 +408,7 @@ func (a *authService) createIDToken(clientID, userID ulid.ULID, nonce, accessTok
 			Issuer:    config.BaseURL(),
 			Subject:   userID.String(),
 			Audience:  jwt.ClaimStrings{clientID.String()},
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * time.Minute)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(accessTokenLifetime)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 		Nonce:  nonce,

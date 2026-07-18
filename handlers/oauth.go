@@ -200,6 +200,7 @@ func (h *Handler) oauthToken(w http.ResponseWriter, r *http.Request) {
 		RedirectURI  string `form:"redirect_uri"`
 		RefreshToken string `form:"refresh_token"`
 		CodeVerifier string `form:"code_verifier"`
+		Scope        string `form:"scope"`
 	}
 
 	data, err := decodeBody[request](r)
@@ -212,11 +213,6 @@ func (h *Handler) oauthToken(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		w.Header().Set("WWW-Authenticate", "Basic realm=\"client authentication\"")
 		respondJSONError(w, errors.New("invalid_client"), http.StatusUnauthorized)
-		return
-	}
-	redirectURI, err := url.Parse(data.RedirectURI)
-	if err != nil {
-		respondJSONError(w, errors.New("invalid_request"), http.StatusBadRequest)
 		return
 	}
 	clientIDStr, err := url.QueryUnescape(username)
@@ -236,14 +232,20 @@ func (h *Handler) oauthToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var grant string
+	var redirectURI *url.URL
 	switch data.GrantType {
 	case "authorization_code":
 		grant = data.Code
+		redirectURI, err = url.Parse(data.RedirectURI)
+		if err != nil {
+			respondJSONError(w, errors.New("invalid_request"), http.StatusBadRequest)
+			return
+		}
 	case "refresh_token":
 		grant = data.RefreshToken
 	}
 
-	access, refresh, id, err := h.AuthService.OAuthGenerateTokens(r.Context(), clientID, clientSecret, redirectURI, data.GrantType, grant, data.CodeVerifier)
+	access, refresh, id, scopes, expiresIn, err := h.AuthService.OAuthGenerateTokens(r.Context(), clientID, clientSecret, redirectURI, data.GrantType, grant, data.CodeVerifier, data.Scope)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidCredentials) {
 			w.Header().Set("WWW-Authenticate", "Basic realm=\"client authentication\"")
@@ -252,6 +254,8 @@ func (h *Handler) oauthToken(w http.ResponseWriter, r *http.Request) {
 			respondJSONError(w, errors.New("unsupported_grant_type"), http.StatusBadRequest)
 		} else if errors.Is(err, services.ErrInvalidGrant) || errors.Is(err, services.ErrReusedToken) {
 			respondJSONError(w, errors.New("invalid_grant"), http.StatusBadRequest)
+		} else if errors.Is(err, services.ErrInvalidScope) {
+			respondJSONError(w, errors.New("invalid_scope"), http.StatusBadRequest)
 		} else if errors.Is(err, services.ErrInvalidRedirectURI) {
 			respondJSONError(w, errors.New("invalid_request"), http.StatusBadRequest)
 		} else {
@@ -264,12 +268,16 @@ func (h *Handler) oauthToken(w http.ResponseWriter, r *http.Request) {
 		TokenType    string `json:"token_type"`
 		AccessToken  string `json:"access_token"`
 		RefreshToken string `json:"refresh_token"`
+		ExpiresIn    int    `json:"expires_in"`
+		Scope        string `json:"scope"`
 		IDToken      string `json:"id_token,omitempty"`
 	}
 	respondJSON(w, http.StatusOK, response{
-		TokenType:    "bearer",
+		TokenType:    "Bearer",
 		AccessToken:  access,
 		RefreshToken: refresh,
+		ExpiresIn:    int(expiresIn.Seconds()),
+		Scope:        strings.Join(scopes, " "),
 		IDToken:      id,
 	})
 }
