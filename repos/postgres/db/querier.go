@@ -16,6 +16,7 @@ type Querier interface {
 	CountRecoveryCodes(ctx context.Context, userID string) (int64, error)
 	CreateChangeEmailRequest(ctx context.Context, arg CreateChangeEmailRequestParams) (pgconn.CommandTag, error)
 	CreateClient(ctx context.Context, arg CreateClientParams) (Client, error)
+	CreateGatewayToken(ctx context.Context, arg CreateGatewayTokenParams) error
 	CreateOAuthToken(ctx context.Context, arg CreateOAuthTokenParams) (Oauth, error)
 	CreatePasskey(ctx context.Context, arg CreatePasskeyParams) (pgconn.CommandTag, error)
 	CreateRecoveryCode(ctx context.Context, arg CreateRecoveryCodeParams) error
@@ -23,6 +24,8 @@ type Querier interface {
 	CreateToken(ctx context.Context, arg CreateTokenParams) (Token, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteClient(ctx context.Context, arg DeleteClientParams) (pgconn.CommandTag, error)
+	DeleteGatewayToken(ctx context.Context, arg DeleteGatewayTokenParams) (pgconn.CommandTag, error)
+	DeleteGatewayTokensByUser(ctx context.Context, arg DeleteGatewayTokensByUserParams) (pgconn.CommandTag, error)
 	DeleteOAuthToken(ctx context.Context, arg DeleteOAuthTokenParams) (pgconn.CommandTag, error)
 	DeleteOAuthTokenByUser(ctx context.Context, arg DeleteOAuthTokenByUserParams) error
 	DeletePasskey(ctx context.Context, arg DeletePasskeyParams) (pgconn.CommandTag, error)
@@ -36,6 +39,7 @@ type Querier interface {
 	FindClient(ctx context.Context, id string) (Client, error)
 	FindClientByUser(ctx context.Context, userID string) ([]Client, error)
 	FindClientByUserAndID(ctx context.Context, arg FindClientByUserAndIDParams) (Client, error)
+	FindGatewayToken(ctx context.Context, arg FindGatewayTokenParams) (GatewayToken, error)
 	FindOAuthPermissions(ctx context.Context, arg FindOAuthPermissionsParams) (Permission, error)
 	FindOAuthToken(ctx context.Context, arg FindOAuthTokenParams) (Oauth, error)
 	FindPasskey(ctx context.Context, arg FindPasskeyParams) (Passkey, error)

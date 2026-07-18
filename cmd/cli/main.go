@@ -75,7 +75,7 @@ func run(args []string) error {
 	tokenRepo := db.NewTokenRepository()
 	emailService := services.NewEmailService(hid.EmailFS)
 	systemRepo := db.NewSystemRepository()
-	authService, err := services.NewAuthService(userRepo, tokenRepo, nil, nil, systemRepo, nil, emailService)
+	authService, err := services.NewAuthService(userRepo, tokenRepo, nil, nil, nil, systemRepo, nil, emailService)
 	if err != nil {
 		return fmt.Errorf("initialize auth service: %w", err)
 	}

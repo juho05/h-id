@@ -11,6 +11,7 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-playground/form/v4"
 	"github.com/go-playground/locales/de"
@@ -20,6 +21,7 @@ import (
 	"github.com/go-playground/validator/v10/non-standard/validators"
 	entrans "github.com/go-playground/validator/v10/translations/en"
 	"github.com/juho05/log"
+	"github.com/oklog/ulid/v2"
 
 	"github.com/juho05/h-id/config"
 	"github.com/juho05/h-id/repos"
@@ -302,38 +304,97 @@ func (h *Handler) redirect(w http.ResponseWriter, r *http.Request, key string) {
 	http.Redirect(w, r, h.popRedirect(r, key), http.StatusSeeOther)
 }
 
-func (h *Handler) getRedirect(r *http.Request, key string) string {
-	key = "redirect:" + key
-	if redirect := h.SessionManager.GetString(r.Context(), key); redirect != "" {
-		u, err := url.Parse(redirect)
-		if err == nil {
-			if u.IsAbs() {
-				if u.Hostname() == config.Domain() || h.AuthGatewayService.IsAllowedDomain(u.Hostname()) {
-					return redirect
-				}
-			} else {
-				return "/" + strings.TrimPrefix(redirect, "/")
-			}
+// validRedirect returns a safe redirect target and true if redirect is allowed:
+// an absolute URL to the H-ID domain or a gateway-allowed domain, or any relative path.
+func (h *Handler) validRedirect(redirect string) (string, bool) {
+	if redirect == "" {
+		return "", false
+	}
+	u, err := url.Parse(redirect)
+	if err != nil {
+		return "", false
+	}
+	if u.IsAbs() {
+		if u.Hostname() == config.Domain() || h.AuthGatewayService.IsAllowedDomain(u.Hostname()) {
+			return redirect, true
 		}
+		return "", false
+	}
+	// Reject protocol-relative ("//host", "/\\host") and backslash-prefixed URLs that
+	// browsers resolve to an external host despite parsing as non-absolute.
+	if u.Host != "" || strings.HasPrefix(redirect, "//") || strings.HasPrefix(redirect, "\\") || strings.HasPrefix(redirect, "/\\") {
+		return "", false
+	}
+	return "/" + strings.TrimPrefix(redirect, "/"), true
+}
+
+func (h *Handler) getRedirect(r *http.Request, key string) string {
+	if redirect, ok := h.validRedirect(h.SessionManager.GetString(r.Context(), "redirect:"+key)); ok {
+		return redirect
 	}
 	return "/"
 }
 
 func (h *Handler) popRedirect(r *http.Request, key string) string {
-	key = "redirect:" + key
-	if redirect := h.SessionManager.PopString(r.Context(), key); redirect != "" {
-		u, err := url.Parse(redirect)
-		if err == nil {
-			if u.IsAbs() {
-				if u.Hostname() == config.Domain() || h.AuthGatewayService.IsAllowedDomain(u.Hostname()) {
-					return redirect
-				}
-			} else {
-				return "/" + strings.TrimPrefix(redirect, "/")
-			}
-		}
+	if redirect, ok := h.validRedirect(h.SessionManager.PopString(r.Context(), "redirect:"+key)); ok {
+		return redirect
 	}
 	return "/"
+}
+
+func (h *Handler) hasValidGatewayCookie(r *http.Request) bool {
+	cookie, err := r.Cookie("h-id_gateway")
+	if err != nil {
+		return false
+	}
+	_, err = h.AuthService.VerifyGatewayToken(r.Context(), cookie.Value)
+	return err == nil
+}
+
+// issueGatewayCookie issues a gateway token only for a fully authenticated user
+// (confirmed email, active 2FA, recovery codes present). The caller must have
+// logged the user in first. This mirrors the login prerequisites the gateway
+// previously enforced via the auth middleware.
+func (h *Handler) issueGatewayCookie(w http.ResponseWriter, r *http.Request, userID ulid.ULID) error {
+	if config.AuthGatewayConfig() == "" {
+		return nil
+	}
+	confirmed, otpActive, hasRecovery, err := h.AuthService.CheckLoginPrerequisites(r.Context())
+	if err != nil {
+		return fmt.Errorf("issue gateway cookie: %w", err)
+	}
+	if !confirmed || !otpActive || !hasRecovery {
+		return nil
+	}
+	secret, err := h.AuthService.CreateGatewayToken(r.Context(), userID)
+	if err != nil {
+		return fmt.Errorf("issue gateway cookie: %w", err)
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     "h-id_gateway",
+		Value:    secret,
+		Path:     "/",
+		Domain:   config.AuthGatewayDomain(),
+		Expires:  time.Now().Add(config.GatewayTokenLifetime()),
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+	return nil
+}
+
+func clearGatewayCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "h-id_gateway",
+		Value:    "",
+		Path:     "/",
+		Domain:   config.AuthGatewayDomain(),
+		Expires:  time.Unix(0, 0),
+		MaxAge:   -1,
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
 }
 
 func notFound(w http.ResponseWriter) {

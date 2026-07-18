@@ -11,6 +11,7 @@ type DB interface {
 	NewUserRepository() UserRepository
 	NewSessionRepository() SessionRepository
 	NewTokenRepository() TokenRepository
+	NewGatewayTokenRepository() GatewayTokenRepository
 	NewClientRepository() ClientRepository
 	NewOAuthRepository() OAuthRepository
 

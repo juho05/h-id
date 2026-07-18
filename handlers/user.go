@@ -169,6 +169,10 @@ func (h *Handler) userSignUp(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
+	if err = h.issueGatewayCookie(w, r, user.ID); err != nil {
+		serverError(w, err)
+		return
+	}
 
 	h.redirect(w, r, "login")
 }
@@ -338,6 +342,10 @@ func (h *Handler) verifyOTPPage(w http.ResponseWriter, r *http.Request) {
 			serverError(w, err)
 			return
 		}
+		if err = h.issueGatewayCookie(w, r, userID); err != nil {
+			serverError(w, err)
+			return
+		}
 		h.redirect(w, r, "login")
 		return
 	}
@@ -382,6 +390,10 @@ func (h *Handler) verifyOTP(w http.ResponseWriter, r *http.Request) {
 
 	err = h.AuthService.Login(r.Context(), userID)
 	if err != nil {
+		serverError(w, err)
+		return
+	}
+	if err = h.issueGatewayCookie(w, r, userID); err != nil {
 		serverError(w, err)
 		return
 	}
@@ -611,6 +623,10 @@ func (h *Handler) verifyPasskeyFinish(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
+	if err = h.issueGatewayCookie(w, r, user.ID); err != nil {
+		serverError(w, err)
+		return
+	}
 	type response struct {
 		Redirect string `json:"redirect"`
 	}
@@ -625,6 +641,13 @@ func (h *Handler) verifyPasskeyFinish(w http.ResponseWriter, r *http.Request) {
 
 // POST /user/logout
 func (h *Handler) userLogout(w http.ResponseWriter, r *http.Request) {
+	if cookie, err := r.Cookie("h-id_gateway"); err == nil {
+		if err := h.AuthService.DeleteGatewayToken(r.Context(), cookie.Value); err != nil {
+			serverError(w, err)
+			return
+		}
+	}
+	clearGatewayCookie(w)
 	err := h.AuthService.Logout(r.Context())
 	if err != nil {
 		serverError(w, err)
@@ -803,6 +826,10 @@ func (h *Handler) userActivateOTP(w http.ResponseWriter, r *http.Request) {
 	if h.AuthService.AuthenticatedUserID(r.Context()) == (ulid.ULID{}) {
 		err = h.AuthService.Login(r.Context(), userID)
 		if err != nil {
+			serverError(w, err)
+			return
+		}
+		if err = h.issueGatewayCookie(w, r, userID); err != nil {
 			serverError(w, err)
 			return
 		}

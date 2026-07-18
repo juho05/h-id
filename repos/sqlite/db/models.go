@@ -19,6 +19,13 @@ type Client struct {
 	UserID       string
 }
 
+type GatewayToken struct {
+	CreatedAt int64
+	UserID    string
+	TokenHash []byte
+	Expires   int64
+}
+
 type Oauth struct {
 	CreatedAt     int64
 	ClientID      string

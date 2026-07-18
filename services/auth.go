@@ -90,6 +90,11 @@ type AuthService interface {
 
 	VerifyAccessToken(ctx context.Context, token string, requiredScopes []string) (userID ulid.ULID, scopes []string, err error)
 
+	CreateGatewayToken(ctx context.Context, userID ulid.ULID) (string, error)
+	VerifyGatewayToken(ctx context.Context, secret string) (userID ulid.ULID, err error)
+	DeleteGatewayToken(ctx context.Context, secret string) error
+	DeleteAllGatewayTokens(ctx context.Context, userID ulid.ULID) error
+
 	DescribeScopes(lang string, scopes []string) []string
 }
 
@@ -112,14 +117,15 @@ func init() {
 }
 
 type authService struct {
-	userRepo       repos.UserRepository
-	clientRepo     repos.ClientRepository
-	tokenRepo      repos.TokenRepository
-	oauthRepo      repos.OAuthRepository
-	systemRepo     repos.SystemRepository
-	sessionManager *scs.SessionManager
-	emailService   EmailService
-	webAuthn       *webauthn.WebAuthn
+	userRepo         repos.UserRepository
+	clientRepo       repos.ClientRepository
+	tokenRepo        repos.TokenRepository
+	gatewayTokenRepo repos.GatewayTokenRepository
+	oauthRepo        repos.OAuthRepository
+	systemRepo       repos.SystemRepository
+	sessionManager   *scs.SessionManager
+	emailService     EmailService
+	webAuthn         *webauthn.WebAuthn
 
 	jwtKeyPriv *rsa.PrivateKey
 	jwtKeyPub  *rsa.PublicKey
@@ -135,7 +141,7 @@ type AuthRequest struct {
 	NeedsConsent  bool
 }
 
-func NewAuthService(userRepository repos.UserRepository, tokenRepository repos.TokenRepository, oauthRepository repos.OAuthRepository, clientRepository repos.ClientRepository, systemRepository repos.SystemRepository, sessionManager *scs.SessionManager, emailService EmailService) (AuthService, error) {
+func NewAuthService(userRepository repos.UserRepository, tokenRepository repos.TokenRepository, gatewayTokenRepository repos.GatewayTokenRepository, oauthRepository repos.OAuthRepository, clientRepository repos.ClientRepository, systemRepository repos.SystemRepository, sessionManager *scs.SessionManager, emailService EmailService) (AuthService, error) {
 	webAuthn, err := webauthn.New(&webauthn.Config{
 		RPDisplayName: "H-ID",
 		RPID:          config.Domain(),
@@ -157,14 +163,15 @@ func NewAuthService(userRepository repos.UserRepository, tokenRepository repos.T
 		return nil, err
 	}
 	a := &authService{
-		userRepo:       userRepository,
-		tokenRepo:      tokenRepository,
-		oauthRepo:      oauthRepository,
-		clientRepo:     clientRepository,
-		systemRepo:     systemRepository,
-		sessionManager: sessionManager,
-		emailService:   emailService,
-		webAuthn:       webAuthn,
+		userRepo:         userRepository,
+		tokenRepo:        tokenRepository,
+		gatewayTokenRepo: gatewayTokenRepository,
+		oauthRepo:        oauthRepository,
+		clientRepo:       clientRepository,
+		systemRepo:       systemRepository,
+		sessionManager:   sessionManager,
+		emailService:     emailService,
+		webAuthn:         webAuthn,
 	}
 	err = a.initKeys(context.Background())
 	if err != nil {
@@ -1023,6 +1030,42 @@ func (a *authService) VerifyAccessToken(ctx context.Context, token string, requi
 		}
 	}
 	return access.UserID, access.Scopes, nil
+}
+
+func (a *authService) CreateGatewayToken(ctx context.Context, userID ulid.ULID) (string, error) {
+	secret := GenerateToken(64)
+	err := a.gatewayTokenRepo.Create(ctx, userID, hashTokenWeak(secret), config.GatewayTokenLifetime())
+	if err != nil {
+		return "", fmt.Errorf("create gateway token: %w", err)
+	}
+	return secret, nil
+}
+
+func (a *authService) VerifyGatewayToken(ctx context.Context, secret string) (ulid.ULID, error) {
+	token, err := a.gatewayTokenRepo.FindByHash(ctx, hashTokenWeak(secret))
+	if err != nil {
+		if errors.Is(err, repos.ErrNoRecord) {
+			return ulid.ULID{}, ErrInvalidCredentials
+		}
+		return ulid.ULID{}, fmt.Errorf("verify gateway token: %w", err)
+	}
+	return token.UserID, nil
+}
+
+func (a *authService) DeleteGatewayToken(ctx context.Context, secret string) error {
+	err := a.gatewayTokenRepo.Delete(ctx, hashTokenWeak(secret))
+	if err != nil && !errors.Is(err, repos.ErrNoRecord) {
+		return fmt.Errorf("delete gateway token: %w", err)
+	}
+	return nil
+}
+
+func (a *authService) DeleteAllGatewayTokens(ctx context.Context, userID ulid.ULID) error {
+	err := a.gatewayTokenRepo.DeleteByUser(ctx, userID)
+	if err != nil && !errors.Is(err, repos.ErrNoRecord) {
+		return fmt.Errorf("delete all gateway tokens: %w", err)
+	}
+	return nil
 }
 
 func generateCode(length int) string {

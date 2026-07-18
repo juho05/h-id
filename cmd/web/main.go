@@ -46,6 +46,7 @@ func run() error {
 
 	userRepo := db.NewUserRepository()
 	tokenRepo := db.NewTokenRepository()
+	gatewayTokenRepo := db.NewGatewayTokenRepository()
 	clientRepo := db.NewClientRepository()
 	oauthRepo := db.NewOAuthRepository()
 	systemRepo := db.NewSystemRepository()
@@ -56,12 +57,11 @@ func run() error {
 	handler.SessionManager.IdleTimeout = config.SessionIdleTimeout()
 	handler.SessionManager.Cookie.Secure = true
 	handler.SessionManager.Cookie.Name = "h-id_session"
-	handler.SessionManager.Cookie.Domain = config.AuthGatewayDomain()
 
 	emailService := services.NewEmailService(hid.EmailFS)
 
 	handler.EmailService = emailService
-	handler.AuthService, err = services.NewAuthService(userRepo, tokenRepo, oauthRepo, clientRepo, systemRepo, handler.SessionManager, emailService)
+	handler.AuthService, err = services.NewAuthService(userRepo, tokenRepo, gatewayTokenRepo, oauthRepo, clientRepo, systemRepo, handler.SessionManager, emailService)
 	if err != nil {
 		return fmt.Errorf("new auth service: %w", err)
 	}

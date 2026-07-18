@@ -303,6 +303,30 @@ func SessionIdleTimeout() (d time.Duration) {
 	return d
 }
 
+func GatewayTokenLifetime() (d time.Duration) {
+	if a, ok := values["AUTH_GATEWAY_LIFETIME"]; ok {
+		return a.(time.Duration)
+	}
+	defer func() {
+		values["AUTH_GATEWAY_LIFETIME"] = d
+	}()
+	def := 30 * 24 * time.Hour
+	durStr := os.Getenv("AUTH_GATEWAY_LIFETIME")
+	if durStr == "" {
+		return def
+	}
+	d, err := time.ParseDuration(durStr)
+	if err != nil {
+		log.Errorf("invalid AUTH_GATEWAY_LIFETIME: %s", err)
+		return def
+	}
+	if d < time.Minute {
+		log.Errorf("invalid AUTH_GATEWAY_LIFETIME: gateway token lifetime must not be < 1min")
+		return def
+	}
+	return d
+}
+
 func AuthGatewayConfig() (path string) {
 	if c, ok := values["AUTH_GATEWAY_CONFIG"]; ok {
 		return c.(string)

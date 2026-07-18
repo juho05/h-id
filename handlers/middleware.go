@@ -96,34 +96,93 @@ func csrf(next http.Handler) http.Handler {
 
 func (h *Handler) noauth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, ok := h.SessionManager.Get(r.Context(), "authUserID").(ulid.ULID)
-		if ok {
-			http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+		userID, ok := h.SessionManager.Get(r.Context(), "authUserID").(ulid.ULID)
+		if !ok {
+			next.ServeHTTP(w, r)
 			return
 		}
+
+		redirect, _ := h.validRedirect(r.URL.Query().Get("redirect"))
+		redirectQuery := ""
+		if redirect != "" {
+			redirectQuery = "?redirect=" + url.QueryEscape(redirect)
+		}
+
+		// Route incomplete accounts through the remaining login prerequisites (like the
+		// auth middleware) before honoring the redirect. Otherwise a gateway login for a
+		// not-yet-fully-set-up user dead-ends: no token can be issued, so the target
+		// bounces back here and loops.
+		confirmed, otpActive, hasRecovery, err := h.AuthService.CheckLoginPrerequisites(r.Context())
+		if err != nil {
+			h.SessionManager.Destroy(r.Context())
+			next.ServeHTTP(w, r)
+			return
+		}
+		switch {
+		case !confirmed:
+			http.Redirect(w, r, "/user/confirmEmail"+redirectQuery, http.StatusSeeOther)
+			return
+		case !otpActive:
+			http.Redirect(w, r, "/user/2fa/otp/activate"+redirectQuery, http.StatusSeeOther)
+			return
+		case !hasRecovery:
+			http.Redirect(w, r, "/user/2fa/recovery"+redirectQuery, http.StatusSeeOther)
+			return
+		}
+
+		if !h.hasValidGatewayCookie(r) {
+			if err := h.issueGatewayCookie(w, r, userID); err != nil {
+				serverError(w, err)
+				return
+			}
+		}
+		if redirect != "" {
+			http.Redirect(w, r, redirect, http.StatusSeeOther)
+			return
+		}
+		http.Redirect(w, r, "/user/profile", http.StatusSeeOther)
+	})
+}
+
+func (h *Handler) gatewayAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		redirectProto := r.Header.Get("X-Forwarded-Proto")
+		redirectHost := r.Header.Get("X-Forwarded-Host")
+		redirectURI := r.Header.Get("X-Forwarded-Uri")
+		if !h.AuthGatewayService.IsAllowedDomain(redirectHost) {
+			clientError(w, http.StatusForbidden)
+			return
+		}
+		uri, err := url.Parse(redirectProto + "://" + redirectHost + redirectURI)
+		if err != nil || !uri.IsAbs() || uri.Host != redirectHost || uri.RequestURI() != redirectURI {
+			clientError(w, http.StatusBadRequest)
+			return
+		}
+		loginURL := fmt.Sprintf("%s/user/login?redirect=%s", config.BaseURL(), url.QueryEscape(uri.String()))
+
+		cookie, err := r.Cookie("h-id_gateway")
+		if err != nil {
+			http.Redirect(w, r, loginURL, http.StatusSeeOther)
+			return
+		}
+		userID, err := h.AuthService.VerifyGatewayToken(r.Context(), cookie.Value)
+		if err != nil {
+			if !errors.Is(err, services.ErrInvalidCredentials) {
+				serverError(w, err)
+				return
+			}
+			http.Redirect(w, r, loginURL, http.StatusSeeOther)
+			return
+		}
+
+		r = r.WithContext(context.WithValue(r.Context(), services.AuthUserIDCtxKey{}, userID))
 		next.ServeHTTP(w, r)
 	})
 }
 
 func (h *Handler) auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		redirect := r.URL.RequestURI()
-		if r.URL.Path == "/gateway/verify" {
-			redirectProto := r.Header.Get("X-Forwarded-Proto")
-			redirectHost := r.Header.Get("X-Forwarded-Host")
-			redirectURI := r.Header.Get("X-Forwarded-Uri")
-			if !h.AuthGatewayService.IsAllowedDomain(redirectHost) {
-				clientError(w, http.StatusForbidden)
-				return
-			}
-			uri, err := url.Parse(redirectProto + "://" + redirectHost + redirectURI)
-			if err != nil || !uri.IsAbs() || uri.Host != redirectHost || uri.RequestURI() != redirectURI {
-				clientError(w, http.StatusBadRequest)
-				return
-			}
-			redirect = uri.String()
-		}
-		redirect = url.QueryEscape(redirect)
+		redirect := url.QueryEscape(r.URL.RequestURI())
 
 		userID, ok := h.SessionManager.Get(r.Context(), "authUserID").(ulid.ULID)
 		if !ok {
