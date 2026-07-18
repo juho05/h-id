@@ -248,7 +248,7 @@ func corsHeaders(next http.Handler) http.Handler {
 	handler := cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"https://*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowCredentials: true,
+		AllowCredentials: false,
 		MaxAge:           int((15 * time.Minute).Seconds()),
 	})
 	return handler(next)
