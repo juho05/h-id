@@ -49,16 +49,23 @@ func InviteOnly() (b bool) {
 	return b
 }
 
-func BehindProxy() (b bool) {
-	if c, ok := values["BEHIND_PROXY"]; ok {
-		return c.(bool)
+func TrustedProxyCount() (c int) {
+	if c, ok := values["TRUSTED_PROXY_COUNT"]; ok {
+		return c.(int)
 	}
 	defer func() {
-		values["BEHIND_PROXY"] = b
+		values["TRUSTED_PROXY_COUNT"] = c
 	}()
-	str := os.Getenv("BEHIND_PROXY")
-	b, _ = strconv.ParseBool(str)
-	return b
+	str := os.Getenv("TRUSTED_PROXY_COUNT")
+	if str == "" {
+		// for backwards compatibility
+		if b, _ := strconv.ParseBool(os.Getenv("BEHIND_PROXY")); b {
+			return 1
+		}
+		return 0
+	}
+	c, _ = strconv.Atoi(str)
+	return c
 }
 
 func Port() (port int) {

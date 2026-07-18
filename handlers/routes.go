@@ -12,7 +12,6 @@ import (
 
 func (h *Handler) registerMiddlewares() {
 	h.Router.Use(recoverPanic)
-	h.Router.Use(middleware.RealIP)
 	h.Router.Use(middleware.RequestID)
 	h.Router.Use(middleware.Timeout(60 * time.Second))
 	h.Router.Use(logRequest)

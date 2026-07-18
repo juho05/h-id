@@ -263,12 +263,30 @@ func rateLimit(tokens int, interval time.Duration) func(next http.Handler) http.
 		panic("init rate limit store: " + err.Error())
 	}
 	var headers []string
-	if config.BehindProxy() {
-		headers = append(headers, "X-Forwarded-For")
+	if config.TrustedProxyCount() > 0 {
+		headers = append(headers, http.CanonicalHeaderKey("X-Forwarded-For"))
 	}
 	mware, err := httplimit.NewMiddleware(store, httplimit.IPKeyFunc(headers...))
 	if err != nil {
 		panic("init rate limit middleware: " + err.Error())
 	}
-	return mware.Handle
+	return func(next http.Handler) http.Handler {
+		limited := mware.Handle(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if config.TrustedProxyCount() > 0 {
+				normalizeXForwardedFor(r)
+			}
+			limited.ServeHTTP(w, r)
+		})
+	}
+}
+
+func normalizeXForwardedFor(r *http.Request) {
+	values := strings.Split(strings.Join(r.Header.Values("X-Forwarded-For"), ","), ",")
+	clientIndex := len(values) - config.TrustedProxyCount()
+	if clientIndex < 0 || clientIndex >= len(values) {
+		r.Header.Del("X-Forwarded-For")
+		return
+	}
+	r.Header.Set("X-Forwarded-For", strings.TrimSpace(values[clientIndex]))
 }
