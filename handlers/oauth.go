@@ -20,8 +20,8 @@ import (
 
 func (h *Handler) oauthRoutes(r chi.Router) {
 	r.With(h.auth).Get("/auth", h.oauthAuth)
-	r.With(h.auth).Get("/consent", h.oauthConsentPage)
-	r.With(h.auth).Post("/consent", h.oauthConsent)
+	r.With(csrf, h.auth).Get("/consent", h.oauthConsentPage)
+	r.With(csrf, h.auth).Post("/consent", h.oauthConsent)
 
 	r.Get("/certs", h.oauthCerts)
 
