@@ -17,16 +17,17 @@ var (
 )
 
 type OAuthTokenModel struct {
-	CreatedAt   time.Time
-	Category    OAuthTokenCategory
-	TokenHash   []byte
-	RedirectURI *url.URL
-	ClientID    ulid.ULID
-	UserID      ulid.ULID
-	Scopes      []string
-	Data        []byte
-	Expires     time.Time
-	Used        bool
+	CreatedAt     time.Time
+	Category      OAuthTokenCategory
+	TokenHash     []byte
+	RedirectURI   *url.URL
+	ClientID      ulid.ULID
+	UserID        ulid.ULID
+	Scopes        []string
+	Data          []byte
+	CodeChallenge string
+	Expires       time.Time
+	Used          bool
 }
 
 type PermissionsModel struct {
@@ -37,7 +38,7 @@ type PermissionsModel struct {
 }
 
 type OAuthRepository interface {
-	Create(ctx context.Context, clientID, userID ulid.ULID, category OAuthTokenCategory, tokenHash []byte, redirectURI *url.URL, scopes []string, data []byte, lifetime time.Duration) (*OAuthTokenModel, error)
+	Create(ctx context.Context, clientID, userID ulid.ULID, category OAuthTokenCategory, tokenHash []byte, redirectURI *url.URL, scopes []string, data []byte, codeChallenge string, lifetime time.Duration) (*OAuthTokenModel, error)
 	Find(ctx context.Context, category OAuthTokenCategory, tokenHash []byte) (*OAuthTokenModel, error)
 	Use(ctx context.Context, clientID ulid.ULID, category OAuthTokenCategory, tokenHash []byte) error
 	Delete(ctx context.Context, clientID ulid.ULID, category OAuthTokenCategory, tokenHash []byte) error

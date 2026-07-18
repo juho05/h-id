@@ -36,16 +36,17 @@ func repoOAuthToken(token db.Oauth) (*repos.OAuthTokenModel, error) {
 		return nil, err
 	}
 	return &repos.OAuthTokenModel{
-		CreatedAt:   time.Unix(token.CreatedAt, 0),
-		Category:    repos.OAuthTokenCategory(token.Category),
-		TokenHash:   token.TokenHash,
-		RedirectURI: redirectURI,
-		ClientID:    clientID,
-		UserID:      userID,
-		Scopes:      strings.Split(token.Scopes, ","),
-		Data:        token.Data,
-		Expires:     time.Unix(token.Expires, 0),
-		Used:        token.Used,
+		CreatedAt:     time.Unix(token.CreatedAt, 0),
+		Category:      repos.OAuthTokenCategory(token.Category),
+		TokenHash:     token.TokenHash,
+		RedirectURI:   redirectURI,
+		ClientID:      clientID,
+		UserID:        userID,
+		Scopes:        strings.Split(token.Scopes, ","),
+		Data:          token.Data,
+		CodeChallenge: token.CodeChallenge,
+		Expires:       time.Unix(token.Expires, 0),
+		Used:          token.Used,
 	}, nil
 }
 
@@ -66,22 +67,23 @@ func repoOAuthPermissions(perms db.Permission) (*repos.PermissionsModel, error) 
 	}, nil
 }
 
-func (a *oauthRepository) Create(ctx context.Context, clientID, userID ulid.ULID, category repos.OAuthTokenCategory, tokenHash []byte, redirectURI *url.URL, scopes []string, data []byte, lifetime time.Duration) (*repos.OAuthTokenModel, error) {
+func (a *oauthRepository) Create(ctx context.Context, clientID, userID ulid.ULID, category repos.OAuthTokenCategory, tokenHash []byte, redirectURI *url.URL, scopes []string, data []byte, codeChallenge string, lifetime time.Duration) (*repos.OAuthTokenModel, error) {
 	var redirectURIStr string
 	if redirectURI != nil {
 		redirectURIStr = redirectURI.String()
 	}
 	token, err := a.db.CreateOAuthToken(ctx, db.CreateOAuthTokenParams{
-		CreatedAt:   time.Now().Unix(),
-		Category:    string(category),
-		TokenHash:   tokenHash,
-		RedirectUri: redirectURIStr,
-		Scopes:      strings.Join(scopes, ","),
-		Data:        data,
-		ClientID:    clientID.String(),
-		UserID:      userID.String(),
-		Expires:     time.Now().Add(lifetime).Unix(),
-		Used:        false,
+		CreatedAt:     time.Now().Unix(),
+		Category:      string(category),
+		TokenHash:     tokenHash,
+		RedirectUri:   redirectURIStr,
+		Scopes:        strings.Join(scopes, ","),
+		Data:          data,
+		CodeChallenge: codeChallenge,
+		ClientID:      clientID.String(),
+		UserID:        userID.String(),
+		Expires:       time.Now().Add(lifetime).Unix(),
+		Used:          false,
 	})
 	if err != nil {
 		return nil, repoErr("create oauth token: %w", err)

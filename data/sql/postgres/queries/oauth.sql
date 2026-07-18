@@ -1,8 +1,8 @@
 -- name: CreateOAuthToken :one
 INSERT INTO oauth (
-  created_at, category, token_hash, redirect_uri, client_id, user_id, scopes, data, expires, used
+  created_at, category, token_hash, redirect_uri, client_id, user_id, scopes, data, code_challenge, expires, used
 ) VALUES (
-  $1,$2,$3,$4,$5,$6,$7,$8,$9,$10
+  $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11
 ) RETURNING *;
 -- name: FindOAuthToken :one
 SELECT * FROM oauth WHERE category = $1 AND token_hash = $2 AND expires > sqlc.arg(now);

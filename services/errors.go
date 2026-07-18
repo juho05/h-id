@@ -12,6 +12,7 @@ var (
 	ErrReusedToken                = errors.New("reused-token")
 	ErrInvalidGrant               = errors.New("invalid-grant")
 	ErrUnsupportedGrantType       = errors.New("unsupported-grant-type")
+	ErrInvalidCodeChallenge       = errors.New("invalid-code-challenge")
 
 	ErrInsufficientScope = errors.New("insufficient-scope")
 )

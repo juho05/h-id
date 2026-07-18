@@ -35,6 +35,8 @@ func (h *Handler) oauthAuth(w http.ResponseWriter, r *http.Request) {
 	responseType := r.URL.Query().Get("response_type")
 	state := r.URL.Query().Get("state")
 	nonce := r.URL.Query().Get("nonce")
+	codeChallenge := r.URL.Query().Get("code_challenge")
+	codeChallengeMethod := r.URL.Query().Get("code_challenge_method")
 
 	clientID, err := ulid.Parse(clientIDStr)
 	if err != nil {
@@ -56,7 +58,7 @@ func (h *Handler) oauthAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.AuthService.StartOAuthCodeFlow(r.Context(), clientID, redirectURI, responseType, scope, state, nonce)
+	err = h.AuthService.StartOAuthCodeFlow(r.Context(), clientID, redirectURI, responseType, scope, state, nonce, codeChallenge, codeChallengeMethod)
 	if err != nil {
 		if errors.Is(err, repos.ErrNoRecord) {
 			clientError(w, http.StatusNotFound)
@@ -74,6 +76,14 @@ func (h *Handler) oauthAuth(w http.ResponseWriter, r *http.Request) {
 		} else if errors.Is(err, services.ErrInvalidScope) {
 			q := redirectURI.Query()
 			q.Add("error", "invalid_scope")
+			if state != "" {
+				q.Add("state", state)
+			}
+			redirectURI.RawQuery = q.Encode()
+			http.Redirect(w, r, redirectURI.String(), http.StatusSeeOther)
+		} else if errors.Is(err, services.ErrInvalidCodeChallenge) {
+			q := redirectURI.Query()
+			q.Add("error", "invalid_request")
 			if state != "" {
 				q.Add("state", state)
 			}
@@ -189,6 +199,7 @@ func (h *Handler) oauthToken(w http.ResponseWriter, r *http.Request) {
 		Code         string `form:"code"`
 		RedirectURI  string `form:"redirect_uri"`
 		RefreshToken string `form:"refresh_token"`
+		CodeVerifier string `form:"code_verifier"`
 	}
 
 	data, err := decodeBody[request](r)
@@ -232,7 +243,7 @@ func (h *Handler) oauthToken(w http.ResponseWriter, r *http.Request) {
 		grant = data.RefreshToken
 	}
 
-	access, refresh, id, err := h.AuthService.OAuthGenerateTokens(r.Context(), clientID, clientSecret, redirectURI, data.GrantType, grant)
+	access, refresh, id, err := h.AuthService.OAuthGenerateTokens(r.Context(), clientID, clientSecret, redirectURI, data.GrantType, grant, data.CodeVerifier)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidCredentials) {
 			w.Header().Set("WWW-Authenticate", "Basic realm=\"client authentication\"")
