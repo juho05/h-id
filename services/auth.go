@@ -376,7 +376,7 @@ func (a *authService) OAuthGenerateTokens(ctx context.Context, clientID ulid.ULI
 
 	var id string
 	if slices.Contains(token.Scopes, "openid") {
-		id, err = a.createIDToken(token.ClientID, token.UserID, nonce)
+		id, err = a.createIDToken(token.ClientID, token.UserID, nonce, access)
 		if err != nil {
 			return "", "", "", fmt.Errorf("oauth tokens by code: %w", err)
 		}
@@ -385,10 +385,11 @@ func (a *authService) OAuthGenerateTokens(ctx context.Context, clientID ulid.ULI
 	return access, refresh, id, nil
 }
 
-func (a *authService) createIDToken(clientID, userID ulid.ULID, nonce string) (string, error) {
+func (a *authService) createIDToken(clientID, userID ulid.ULID, nonce, accessToken string) (string, error) {
 	type claims struct {
 		jwt.RegisteredClaims
-		Nonce string `json:"nonce,omitempty"`
+		Nonce  string `json:"nonce,omitempty"`
+		AtHash string `json:"at_hash,omitempty"`
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims{
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -398,9 +399,17 @@ func (a *authService) createIDToken(clientID, userID ulid.ULID, nonce string) (s
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
-		Nonce: nonce,
+		Nonce:  nonce,
+		AtHash: atHash(accessToken),
 	})
 	return token.SignedString(a.jwtKeyPriv)
+}
+
+// atHash computes the OIDC at_hash claim: base64url of the left-most half of
+// the SHA-256 hash of the access token (SHA-256 matches the RS256 signature).
+func atHash(accessToken string) string {
+	sum := sha256.Sum256([]byte(accessToken))
+	return base64.RawURLEncoding.EncodeToString(sum[:len(sum)/2])
 }
 
 func (a *authService) VerifyClientCredentials(ctx context.Context, clientID ulid.ULID, clientSecret string) error {
